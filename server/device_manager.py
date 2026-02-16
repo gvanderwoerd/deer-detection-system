@@ -8,13 +8,9 @@ import logging
 import threading
 import time
 from typing import Dict, List
+from config import TUYA_CLOUD_API_KEY, TUYA_CLOUD_API_SECRET, TUYA_CLOUD_REGION
 
 logger = logging.getLogger(__name__)
-
-# Cloud API credentials
-CLOUD_API_KEY = "rqwuq7sgvv57f745g5m8"
-CLOUD_API_SECRET = "f64c246ade9f45cf9c4217851deceddc"
-CLOUD_REGION = "us"
 
 
 class DeviceManager:
@@ -22,9 +18,9 @@ class DeviceManager:
 
     def __init__(self):
         self.cloud = tinytuya.Cloud(
-            apiRegion=CLOUD_REGION,
-            apiKey=CLOUD_API_KEY,
-            apiSecret=CLOUD_API_SECRET
+            apiRegion=TUYA_CLOUD_REGION,
+            apiKey=TUYA_CLOUD_API_KEY,
+            apiSecret=TUYA_CLOUD_API_SECRET
         )
         self.devices = {}  # device_id -> device_info
         self.device_status = {}  # device_id -> status

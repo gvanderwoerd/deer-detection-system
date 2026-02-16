@@ -17,12 +17,13 @@ SPRINKLER_DURATION_SECONDS = 60  # Sprinkler runs for 60 seconds
 COOLDOWN_PERIOD_SECONDS = 120  # Wait 2 minutes between activations
 MAX_DETECTIONS_PER_SESSION = 3  # Max times to activate sprinkler in one session
 
-# === Tuya Valve Configuration ===
-# Run 'python3 -m tinytuya wizard' to get these values
-TUYA_DEVICE_ID = 'eb2f5498a4e53362f5lumi'
-TUYA_DEVICE_IP = ''  # Will auto-discover
-TUYA_LOCAL_KEY = '<H9*v1oW<uObQt]I'
-TUYA_DEVICE_VERSION = '3.3'  # Most devices use 3.3
+# === Tuya Cloud API Configuration ===
+TUYA_CLOUD_API_KEY = "rqwuq7sgvv57f745g5m8"
+TUYA_CLOUD_API_SECRET = "f64c246ade9f45cf9c4217851deceddc"
+TUYA_CLOUD_REGION = "us"
+
+# Primary valve for deer detection system
+PRIMARY_VALVE_ID = 'eb2f5498a4e53362f5lumi'  # Back flowers valve
 
 # === Logging ===
 LOG_DETECTIONS = True
