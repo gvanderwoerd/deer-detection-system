@@ -2,7 +2,7 @@
 
 **Date Started:** 2026-02-14
 **Status:** ✅ **FULLY OPERATIONAL** - Multi-device SmartLife integration complete
-**Last Updated:** 2026-02-16
+**Last Updated:** 2026-02-16 13:10
 
 ---
 
@@ -153,11 +153,12 @@ socketio = SocketIO(app, async_mode='threading')
 
 ```
 /mnt/linux-data/deer-detection-system/
-├── start.sh                    ✨ Launch system
-├── stop.sh                     ✨ Stop system
-├── .gitignore                  ✨ Git ignore rules
-├── PROJECT_LOG.md              This file
-├── README.md                   Project documentation
+├── start.sh                         ✨ Launch system
+├── stop.sh                          ✨ Stop system
+├── .gitignore                       ✨ Git ignore rules
+├── PROJECT_LOG.md                   This file (complete history)
+├── README.md                        Project documentation
+├── TROUBLESHOOTING_QUICK_REF.md     ✨ Quick troubleshooting guide
 │
 ├── esp32-cam/
 │   ├── platformio.ini          ESP32 build config
@@ -291,11 +292,39 @@ PRIMARY_VALVE_ID = 'eb2f5498a4e53362f5lumi'
 # Check if port in use
 lsof -i:5000
 
-# Kill existing server
+# Kill existing server (handles multiple instances)
 ./stop.sh
 
-# Check logs
+# Check logs for errors
 tail -f logs/server.log
+
+# If multiple processes running
+lsof -ti:5000 | xargs kill -9
+
+# Verify port is free
+lsof -i:5000  # Should return nothing
+```
+
+### Browser Shows "Connection Refused"
+**Symptoms:** `start.sh` appears to succeed but browser can't connect
+
+**Common Causes:**
+1. Multiple server instances running (port conflict)
+2. Server crashed after startup
+3. Browser opened before server fully initialized
+
+**Solution:**
+```bash
+# Stop all instances
+./stop.sh
+
+# Wait a moment
+sleep 2
+
+# Start fresh
+./start.sh
+
+# If prompted about existing server, choose 'y' to kill and restart
 ```
 
 ### Devices Show Offline (But Are Actually Online)
@@ -327,6 +356,49 @@ curl -I http://192.168.1.16:81/stream
 3. Verify confidence scores
 4. Check if person in frame (safety block)
 5. Manual trigger: `curl -X POST http://localhost:5000/api/trigger`
+
+---
+
+## Troubleshooting & Maintenance Log
+
+### 2026-02-16 13:00: Startup Issue Resolution
+
+**Problem:**
+- User ran `start.sh` but browser failed to connect
+- Chrome showed "localhost refused to connect" error
+- Server appeared to start but was not accessible
+
+**Root Cause:**
+- Multiple server instances (PIDs 2993 and 5278) running simultaneously
+- Port conflict caused startup issues
+- First instance likely crashed after initial startup
+- Browser opened before server was fully stable
+
+**Resolution Steps:**
+1. Identified two conflicting server processes on port 5000
+2. Used `./stop.sh` to kill both instances (PIDs 2993, 5278)
+3. Restarted server cleanly with `./start.sh`
+4. Verified server responding on both localhost:5000 and 192.168.1.15:5000
+5. Confirmed web dashboard fully functional
+
+**Post-Fix Status:**
+- ✓ Server running correctly (PID 6050)
+- ✓ Web dashboard accessible and functional
+- ✓ All API endpoints responding
+- ✓ SmartLife device integration working
+- ⚠️ ESP32-CAM offline (expected - hardware not powered on)
+
+**Lessons Learned:**
+- Multiple `start.sh` runs can create orphaned processes
+- Always use `./stop.sh` before restarting server
+- Server gracefully handles ESP32-CAM being offline (retries every 5 seconds)
+- Log shows misleading "Address already in use" message but server still starts
+
+**Recommendations for Future:**
+1. Add process cleanup to `start.sh` (kill any existing instances automatically)
+2. Implement systemd service for auto-start on boot
+3. Add health check endpoint for monitoring
+4. Consider adding PID file to track server process
 
 ---
 

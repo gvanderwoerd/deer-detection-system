@@ -14,13 +14,20 @@ echo -e "${GREEN}🦌 Starting Deer Detection System...${NC}"
 
 # Check if server is already running
 if lsof -Pi :5000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-    echo -e "${YELLOW}⚠️  Server already running on port 5000${NC}"
+    EXISTING_PIDS=$(lsof -ti:5000)
+    echo -e "${YELLOW}⚠️  Server already running on port 5000 (PID: $EXISTING_PIDS)${NC}"
     read -p "Kill existing server and restart? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo -e "${YELLOW}Stopping existing server...${NC}"
+        echo -e "${YELLOW}Stopping existing server(s)...${NC}"
         lsof -ti:5000 | xargs kill -9 2>/dev/null || true
         sleep 2
+        # Verify all instances are stopped
+        if lsof -Pi :5000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+            echo -e "${RED}✗ Failed to stop server${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✓ All existing instances stopped${NC}"
     else
         echo -e "${GREEN}Opening dashboard in existing server...${NC}"
         xdg-open http://192.168.1.15:5000 &
