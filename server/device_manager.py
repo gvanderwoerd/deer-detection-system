@@ -51,7 +51,7 @@ class DeviceManager:
                         'model': device.get('model', 'Unknown'),
                         'category': device.get('category', 'unknown'),
                         'local_key': device.get('key', ''),
-                        'online': device.get('online', False),
+                        'online': False,  # Will be updated by get_device_status()
                         'icon': device.get('icon', '')
                     }
 
@@ -78,43 +78,53 @@ class DeviceManager:
     def get_device_status(self, device_id: str) -> Dict:
         """Get current status of a device"""
         try:
-            result = self.cloud.getstatus(device_id)
+            # Check if device is actually online using getconnectstatus()
+            is_online = False
+            try:
+                connect_status = self.cloud.getconnectstatus(device_id)
+                is_online = bool(connect_status)
+            except Exception as e:
+                logger.warning(f"Could not get connection status for {device_id}: {e}")
+                is_online = False
 
-            if 'result' in result:
-                status_data = result['result']
+            # Update device online status
+            if device_id in self.devices:
+                self.devices[device_id]['online'] = is_online
 
-                # Parse status - look for switch state
-                is_on = False
-                for item in status_data:
-                    if item.get('code') in ['switch_1', 'switch']:
-                        is_on = item.get('value', False)
-                        break
+            # Get device state (only meaningful if online)
+            is_on = False
+            if is_online:
+                result = self.cloud.getstatus(device_id)
+                if 'result' in result and 'success' in result and result['success']:
+                    status_data = result['result']
+                    # Parse status - look for switch state
+                    for item in status_data:
+                        if item.get('code') in ['switch_1', 'switch']:
+                            is_on = item.get('value', False)
+                            break
 
-                status = {
-                    'online': True,
-                    'is_on': is_on,
-                    'last_update': time.time()
-                }
+            status = {
+                'online': is_online,
+                'is_on': is_on,
+                'last_update': time.time()
+            }
 
-                self.device_status[device_id] = status
-                return status
-            else:
-                # Device might be offline
-                status = {
-                    'online': False,
-                    'is_on': False,
-                    'last_update': time.time()
-                }
-                self.device_status[device_id] = status
-                return status
+            self.device_status[device_id] = status
+            return status
 
         except Exception as e:
             logger.error(f"Error getting status for {device_id}: {e}")
-            return {
+            status = {
                 'online': False,
                 'is_on': False,
                 'error': str(e)
             }
+
+            # Update device online status
+            if device_id in self.devices:
+                self.devices[device_id]['online'] = False
+
+            return status
 
     def turn_on(self, device_id: str, duration: int = 0) -> bool:
         """Turn device ON"""
