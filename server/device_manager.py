@@ -198,7 +198,7 @@ class DeviceManager:
                 'name': device_info['name'],
                 'model': device_info['model'],
                 'category': device_info['category'],
-                'online': status.get('online', False),
+                'online': device_info['online'],  # Use actual online status from device info
                 'is_on': status.get('is_on', False),
                 'icon': device_info.get('icon', '')
             })
