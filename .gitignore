@@ -21,6 +21,7 @@ ENV/
 
 # Logs
 *.log
+logs/
 
 # PlatformIO
 .pio/
