@@ -1,0 +1,35 @@
+# Deer Detection System Configuration
+
+# === Network Configuration ===
+SERVER_HOST = '0.0.0.0'  # Listen on all interfaces
+SERVER_PORT = 5000
+ESP32_CAM_STREAM_URL = 'http://192.168.1.16:81/stream'  # ESP32-CAM IP
+
+# === Detection Configuration ===
+DETECTION_CONFIDENCE = 0.25  # Confidence threshold (0.0-1.0) - lowered for testing
+TARGET_CLASS_IDS = [23, 21, 19]  # COCO: deer=23, cow=21, sheep=19
+PERSON_CLASS_ID = 0  # COCO: person=0 (safety check - never activate with people)
+MODEL_PATH = 'yolov8n.pt'  # YOLOv8 nano model
+
+# === System Behavior ===
+ACTIVE_WINDOW_SECONDS = 300  # 5 minutes after motion detected
+SPRINKLER_DURATION_SECONDS = 60  # Sprinkler runs for 60 seconds
+COOLDOWN_PERIOD_SECONDS = 120  # Wait 2 minutes between activations
+MAX_DETECTIONS_PER_SESSION = 3  # Max times to activate sprinkler in one session
+
+# === Tuya Valve Configuration ===
+# Run 'python3 -m tinytuya wizard' to get these values
+TUYA_DEVICE_ID = 'eb2f5498a4e53362f5lumi'
+TUYA_DEVICE_IP = ''  # Will auto-discover
+TUYA_LOCAL_KEY = '<H9*v1oW<uObQt]I'
+TUYA_DEVICE_VERSION = '3.3'  # Most devices use 3.3
+
+# === Logging ===
+LOG_DETECTIONS = True
+LOG_FILE = 'deer_detection.log'
+MAX_LOG_ENTRIES = 1000  # Keep last 1000 events in memory
+
+# === WiFi Configuration (for reference - enter in ESP32-CAM) ===
+# WIFI_SSID = 'YourNetworkName'
+# WIFI_PASSWORD = 'YourPassword'
+# ESP32_GPIO_TRIGGER_PIN = 13  # GPIO pin for Yard Sentinel trigger

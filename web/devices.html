@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartLife Devices - Deer Detection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .device-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .device-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .device-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .device-model {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .status-badges {
+            display: flex;
+            gap: 8px;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-on {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .badge-off {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .device-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .control-row .btn {
+            flex: 1;
+            font-size: 13px;
+            padding: 8px 12px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 18px;
+        }
+
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        .status-indicator.online {
+            background: #27ae60;
+            box-shadow: 0 0 8px #27ae60;
+        }
+
+        .status-indicator.offline {
+            background: #e74c3c;
+        }
+
+        #lastUpdate {
+            color: white;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏠 SmartLife Devices</h1>
+            <p>Deer Detection System - Device Management</p>
+            <div class="header-controls">
+                <button class="btn btn-primary" onclick="refreshDevices()">🔄 Refresh Devices</button>
+                <button class="btn btn-danger" onclick="emergencyStopAll()">🚨 EMERGENCY STOP ALL</button>
+                <button class="btn btn-primary" onclick="window.location.href='/'">📹 Back to Dashboard</button>
+            </div>
+            <div id="lastUpdate"></div>
+        </header>
+
+        <div id="loading" class="loading">Loading devices...</div>
+        <div id="error" class="error" style="display:none;"></div>
+        <div id="devicesGrid" class="devices-grid"></div>
+    </div>
+
+    <script>
+        let devices = [];
+
+        // Load devices on page load
+        loadDevices();
+
+        // Auto-refresh every 10 seconds
+        setInterval(loadDevices, 10000);
+
+        function loadDevices() {
+            fetch('/api/devices')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        devices = data.devices;
+                        renderDevices();
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('lastUpdate').textContent = 
+                            `Last updated: ${new Date().toLocaleTimeString()}`;
+                    } else {
+                        showError('Failed to load devices: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    showError('Error loading devices: ' + err.message);
+                });
+        }
+
+        function renderDevices() {
+            const grid = document.getElementById('devicesGrid');
+
+            if (devices.length === 0) {
+                grid.innerHTML = '<div class="loading">No devices found</div>';
+                return;
+            }
+
+            grid.innerHTML = devices.map(device => `
+                <div class="device-card">
+                    <div class="device-header">
+                        <div>
+                            <div class="device-name">
+                                <span class="status-indicator ${device.online ? 'online' : 'offline'}"></span>
+                                ${device.name}
+                            </div>
+                            <div class="device-model">${device.model}</div>
+                        </div>
+                        <div class="status-badges">
+                            <span class="badge ${device.online ? 'badge-online' : 'badge-offline'}">
+                                ${device.online ? 'Online' : 'Offline'}
+                            </span>
+                            <span class="badge ${device.is_on ? 'badge-on' : 'badge-off'}">
+                                ${device.is_on ? 'ON' : 'OFF'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="device-controls">
+                        <div class="control-row">
+                            <button class="btn btn-success" onclick="turnOn('${device.id}')" 
+                                    ${!device.online ? 'disabled' : ''}>
+                                ▶️ Turn ON
+                            </button>
+                            <button class="btn btn-danger" onclick="turnOff('${device.id}')"
+                                    ${!device.online ? 'disabled' : ''}>
+                                ⏹️ Turn OFF
+                            </button>
+                        </div>
+                        <button class="btn btn-warning" onclick="testDevice('${device.id}')"
+                                ${!device.online ? 'disabled' : ''}>
+                            🧪 Test (10s)
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function refreshDevices() {
+            document.getElementById('loading').style.display = 'block';
+            fetch('/api/devices/refresh', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        devices = data.devices;
+                        renderDevices();
+                        document.getElementById('loading').style.display = 'none';
+                        alert(`✅ Refreshed! Found ${devices.length} devices`);
+                    } else {
+                        showError('Refresh failed: ' + data.error);
+                    }
+                })
+                .catch(err => showError('Refresh error: ' + err.message));
+        }
+
+        function turnOn(deviceId) {
+            fetch(`/api/device/${deviceId}/on`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        setTimeout(loadDevices, 1000);
+                    } else {
+                        alert('❌ Failed to turn on device');
+                    }
+                });
+        }
+
+        function turnOff(deviceId) {
+            fetch(`/api/device/${deviceId}/off`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        setTimeout(loadDevices, 1000);
+                    } else {
+                        alert('❌ Failed to turn off device');
+                    }
+                });
+        }
+
+        function testDevice(deviceId) {
+            if (confirm('Test device for 10 seconds?')) {
+                fetch(`/api/device/${deviceId}/test`, { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('✅ Test started! Device will run for 10 seconds');
+                            setTimeout(loadDevices, 1000);
+                        } else {
+                            alert('❌ Test failed');
+                        }
+                    });
+            }
+        }
+
+        function emergencyStopAll() {
+            if (confirm('🚨 EMERGENCY STOP ALL DEVICES?\n\nThis will immediately turn off ALL valves!')) {
+                fetch('/api/devices/emergency_stop', { method: 'POST' })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('✅ All devices stopped!');
+                            loadDevices();
+                        } else {
+                            alert('❌ Emergency stop failed: ' + data.error);
+                        }
+                    });
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deer Detection System</title>
+    <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🦌 Deer Detection System</h1>
+            <div class="status-bar">
+                <div class="status-item">
+                    <span class="label">Status:</span>
+                    <span id="system-status" class="status-badge">Initializing...</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Valve:</span>
+                    <span id="valve-status" class="status-badge">Unknown</span>
+                </div>
+                <div class="status-item">
+                    <span class="label">Last Detection:</span>
+                    <span id="last-detection">Never</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel - Video Feed -->
+            <div class="video-panel">
+                <div class="video-container">
+                    <img id="video-feed" src="/video_feed" alt="Camera Feed">
+                    <div id="no-feed-message" class="no-feed">
+                        <p>📷 Waiting for camera...</p>
+                        <p class="small">ESP32-CAM will activate on motion detection</p>
+                    </div>
+                </div>
+
+                <div class="detection-info">
+                    <div class="info-item">
+                        <span>Session Detections:</span>
+                        <span id="session-detections">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span>Cooldown:</span>
+                        <span id="cooldown-status">None</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel - Controls and Logs -->
+            <div class="control-panel">
+                <!-- System Controls -->
+                <div class="controls">
+                    <h2>System Controls</h2>
+
+                    <button id="btn-enable" class="btn btn-success btn-large">
+                        Enable System
+                    </button>
+
+                    <button id="btn-disable" class="btn btn-danger btn-large">
+                        Disable System
+                    </button>
+
+                    <hr>
+
+                    <h3>Camera Controls</h3>
+
+                    <button id="btn-toggle-camera" class="btn btn-secondary btn-large">
+                        📹 View Live Camera
+                    </button>
+
+                    <hr>
+
+                    <h3>Device Management</h3>
+
+                    <button onclick="window.location.href='/devices'" class="btn btn-primary btn-large">
+                        🏠 Manage SmartLife Devices
+                    </button>
+                </div>
+
+                <!-- Event Log -->
+                <div class="log-panel">
+                    <h2>Event Log</h2>
+                    <div id="event-log" class="log-content">
+                        <div class="log-entry">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-message">System starting...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <div class="connection-status">
+                <span id="connection-indicator" class="indicator">⚪</span>
+                <span id="connection-text">Connecting...</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Include Socket.IO client -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="app.js?v=2"></script>
+</body>
+</html>
