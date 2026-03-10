@@ -32,23 +32,39 @@ let cameraKeepAliveInterval = null;
 
 // Initialize WebSocket connection
 function connectWebSocket() {
-    console.log('Connecting to WebSocket...');
+    console.log('[DEBUG] Connecting to WebSocket...');
 
-    socket = io();
+    try {
+        socket = io({
+            transports: ['polling', 'websocket'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 10
+        });
 
-    socket.on('connect', () => {
-        console.log('WebSocket connected');
-        isConnected = true;
-        updateConnectionStatus(true);
-        addLogEntry('system', 'Connected to server');
-    });
+        socket.on('connect', () => {
+            console.log('[DEBUG] ✅ WebSocket connected! Socket ID:', socket.id);
+            isConnected = true;
+            updateConnectionStatus(true);
+            addLogEntry('system', 'Connected to server');
+        });
 
-    socket.on('disconnect', () => {
-        console.log('WebSocket disconnected');
-        isConnected = false;
-        updateConnectionStatus(false);
-        addLogEntry('error', 'Disconnected from server');
-    });
+        socket.on('disconnect', () => {
+            console.log('[DEBUG] ❌ WebSocket disconnected');
+            isConnected = false;
+            updateConnectionStatus(false);
+            addLogEntry('error', 'Disconnected from server');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('[DEBUG] ❌ WebSocket connection error:', error);
+            addLogEntry('error', 'Connection error: ' + error.message);
+        });
+
+        socket.on('connect_timeout', () => {
+            console.error('[DEBUG] ⏱️ WebSocket connection timeout');
+            addLogEntry('error', 'Connection timeout');
+        });
 
     socket.on('status', (data) => {
         updateStatus(data);
@@ -60,6 +76,10 @@ function connectWebSocket() {
 
     socket.on('event', (data) => {
         handleEvent(data);
+    });
+
+    socket.on('camera_status', (data) => {
+        handleCameraStatus(data);
     });
 }
 
@@ -162,6 +182,25 @@ function handleEvent(event) {
     // Play sound for deer detection (optional)
     if (eventType === 'detection' && event.message.includes('Deer detected')) {
         playAlert();
+    }
+}
+
+// Handle camera status updates
+function handleCameraStatus(data) {
+    console.log('Camera status:', data);
+
+    if (data.active) {
+        // Camera is streaming - hide overlay
+        if (elements.noFeedMessage) {
+            elements.noFeedMessage.style.display = 'none';
+        }
+        addLogEntry('camera', '📷 ESP32-CAM active - streaming');
+    } else {
+        // Camera went to sleep - show overlay
+        if (elements.noFeedMessage) {
+            elements.noFeedMessage.style.display = 'flex';
+        }
+        addLogEntry('camera', '💤 ESP32-CAM sleeping');
     }
 }
 
@@ -309,20 +348,99 @@ async function pollStatus() {
 
 // Check video feed
 function checkVideoFeed() {
-    elements.videoFeed.onerror = () => {
-        elements.noFeedMessage.style.display = 'flex';
-    };
+    // Monitor when video feed starts/stops loading
+    let frameReceived = false;
 
-    elements.videoFeed.onload = () => {
-        elements.noFeedMessage.style.display = 'none';
-    };
+    elements.videoFeed.addEventListener('load', () => {
+        if (!frameReceived) {
+            frameReceived = true;
+            console.log('Video feed: First frame received');
+            if (elements.noFeedMessage) {
+                elements.noFeedMessage.style.display = 'none';
+            }
+        }
+    });
+
+    elements.videoFeed.addEventListener('error', () => {
+        console.log('Video feed: Error loading');
+        if (elements.noFeedMessage) {
+            elements.noFeedMessage.style.display = 'flex';
+        }
+    });
+
+    // Check if video is actually playing (receiving frames)
+    setInterval(() => {
+        // If we have a video feed src and it's not showing error
+        if (elements.videoFeed.complete && elements.videoFeed.naturalHeight !== 0) {
+            if (elements.noFeedMessage && elements.noFeedMessage.style.display !== 'none') {
+                elements.noFeedMessage.style.display = 'none';
+            }
+        }
+    }, 2000);
+}
+
+// Load recent logs from server
+async function loadRecentLogs() {
+    console.log('[DEBUG] Loading recent logs...');
+    try {
+        const response = await fetch('/api/logs');
+        console.log('[DEBUG] Logs response status:', response.status);
+
+        const logs = await response.json();
+        console.log('[DEBUG] Loaded logs:', logs.length, 'entries');
+
+        // Clear placeholder
+        if (elements.eventLog) {
+            elements.eventLog.innerHTML = '';
+        } else {
+            console.error('[DEBUG] eventLog element not found!');
+            return;
+        }
+
+        // Add logs (they come in chronological order, but we want newest first)
+        if (logs && logs.length > 0) {
+            // Reverse to show newest first
+            logs.reverse().forEach(log => {
+                const timestamp = new Date(log.timestamp).toLocaleTimeString();
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${log.type}`;
+                entry.innerHTML = `
+                    <span class="log-time">${timestamp}</span>
+                    <span class="log-message">${log.message}</span>
+                `;
+                elements.eventLog.appendChild(entry);
+            });
+            console.log('[DEBUG] Added', logs.length, 'log entries to display');
+        } else {
+            // No logs yet
+            console.log('[DEBUG] No logs available, adding placeholder');
+            addLogEntry('system', 'System initialized - waiting for events...');
+        }
+    } catch (error) {
+        console.error('[DEBUG] Failed to load logs:', error);
+        addLogEntry('error', 'Failed to load event history');
+        addLogEntry('system', 'Connected - ready for monitoring');
+    }
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Deer Detection System UI initializing...');
+    console.log('[DEBUG] ========================================');
+    console.log('[DEBUG] Deer Detection System UI initializing...');
+    console.log('[DEBUG] ========================================');
+    console.log('[DEBUG] Elements check:');
+    console.log('[DEBUG] - eventLog:', elements.eventLog ? 'FOUND' : 'MISSING');
+    console.log('[DEBUG] - systemStatus:', elements.systemStatus ? 'FOUND' : 'MISSING');
+    console.log('[DEBUG] - connectionIndicator:', elements.connectionIndicator ? 'FOUND' : 'MISSING');
 
+    // Load recent logs first
+    console.log('[DEBUG] Step 1: Loading recent logs...');
+    loadRecentLogs();
+
+    console.log('[DEBUG] Step 2: Connecting WebSocket...');
     connectWebSocket();
+
+    console.log('[DEBUG] Step 3: Setting up video feed...');
     checkVideoFeed();
 
     // Hide overlay since we're using direct stream URL
@@ -334,10 +452,17 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.noFeedMessage.classList.add('hidden');
     }
 
+    console.log('[DEBUG] Step 4: Starting status polling...');
     // Poll status every 5 seconds as backup
     setInterval(pollStatus, 5000);
 
-    addLogEntry('system', 'UI loaded successfully');
+    // Initial status poll
+    console.log('[DEBUG] Step 5: Initial status poll...');
+    pollStatus();
+
+    console.log('[DEBUG] ========================================');
+    console.log('[DEBUG] Initialization complete!');
+    console.log('[DEBUG] ========================================');
 });
 
 // Handle page visibility

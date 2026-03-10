@@ -21,7 +21,20 @@ ENV/
 
 # Logs
 *.log
+*.log.*
 logs/
+
+# Backup files
+*.backup.*
+*.bak
+*.old
+
+# Detection images (generated at runtime)
+server/detections/*.jpg
+server/detections/*.png
+
+# Runtime
+*.pid
 
 # PlatformIO
 .pio/

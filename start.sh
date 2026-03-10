@@ -64,10 +64,11 @@ if [ ! -f "tinytuya.json" ]; then
     echo -e "${YELLOW}Device control may not work without Tuya credentials${NC}"
 fi
 
-# Start the Flask server
+# Start the Flask server with nohup (keeps running after terminal closes)
 echo -e "${GREEN}Starting Flask server...${NC}"
-python3 main.py > ../logs/server.log 2>&1 &
+nohup python3 main.py > ../logs/server.log 2>&1 &
 SERVER_PID=$!
+echo $SERVER_PID > ../server.pid
 
 # Wait for server to start
 echo -e "${YELLOW}Waiting for server to initialize...${NC}"
@@ -98,6 +99,6 @@ echo -e "  Device Manager:  ${YELLOW}http://192.168.1.15:5000/devices${NC}"
 echo -e "  Server PID:      ${YELLOW}$SERVER_PID${NC}"
 echo -e "  Logs:            ${YELLOW}logs/server.log${NC}"
 echo ""
-echo -e "To stop the server: ${YELLOW}kill $SERVER_PID${NC}"
-echo -e "Or use: ${YELLOW}lsof -ti:5000 | xargs kill${NC}"
+echo -e "Server will keep running even if you close this terminal."
+echo -e "To stop the server: ${YELLOW}./stop.sh${NC}"
 echo ""

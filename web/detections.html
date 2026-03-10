@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detection Gallery - Deer Detection System</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Gallery-specific styles */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .stats-bar {
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            color: #95a5a6;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .delete-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select {
+            padding: 10px;
+            background: #34495e;
+            color: white;
+            border: 2px solid #3498db;
+            border-radius: 5px;
+            font-size: 0.95em;
+            cursor: pointer;
+        }
+
+        select:hover {
+            background: #2c3e50;
+        }
+
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: bold;
+        }
+
+        .btn-delete:hover {
+            background: #c0392b;
+        }
+
+        .btn-refresh {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: bold;
+        }
+
+        .btn-refresh:hover {
+            background: #2980b9;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .detection-card {
+            background: #2c3e50;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .detection-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .detection-image {
+            width: 100%;
+            height: 280px;
+            object-fit: cover;
+            cursor: pointer;
+        }
+
+        .detection-info {
+            padding: 15px;
+        }
+
+        .detection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .animal-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            background: #3498db;
+            color: white;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .animal-badge.deer {
+            background: #e67e22;
+        }
+
+        .animal-badge.cow {
+            background: #9b59b6;
+        }
+
+        .animal-badge.sheep {
+            background: #1abc9c;
+        }
+
+        .confidence {
+            font-size: 0.9em;
+            color: #95a5a6;
+        }
+
+        .confidence-value {
+            color: #2ecc71;
+            font-weight: bold;
+        }
+
+        .detection-time {
+            font-size: 0.9em;
+            color: #bdc3c7;
+            margin-top: 5px;
+        }
+
+        .detection-count {
+            font-size: 0.85em;
+            color: #95a5a6;
+            margin-top: 5px;
+        }
+
+        .no-detections {
+            text-align: center;
+            padding: 60px 20px;
+            color: #95a5a6;
+            font-size: 1.2em;
+        }
+
+        .no-detections-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: #bbb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-link {
+            color: #3498db;
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+
+        .nav-link:hover {
+            background: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🦌 Detection Gallery</h1>
+                <div class="nav-links">
+                    <a href="/" class="nav-link">← Back to Dashboard</a>
+                    <a href="/devices" class="nav-link">Devices</a>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn-refresh" onclick="loadDetections()">
+                    🔄 Refresh
+                </button>
+                <div class="delete-controls">
+                    <select id="deleteFilter">
+                        <option value="10min">Last 10 minutes</option>
+                        <option value="hour">Last 1 hour</option>
+                        <option value="day">Last 24 hours</option>
+                        <option value="week">Last week</option>
+                        <option value="month">Last month</option>
+                        <option value="year">Last year</option>
+                        <option value="all">All time</option>
+                    </select>
+                    <button class="btn-delete" onclick="deleteDetections()">
+                        🗑️ Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item">
+                <div class="stat-label">Total Detections</div>
+                <div class="stat-value" id="totalCount">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Deer</div>
+                <div class="stat-value" id="deerCount" style="color: #e67e22;">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Cow</div>
+                <div class="stat-value" id="cowCount" style="color: #9b59b6;">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Sheep</div>
+                <div class="stat-value" id="sheepCount" style="color: #1abc9c;">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Newest</div>
+                <div class="stat-value" id="newestDate" style="font-size: 1em;">-</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Oldest</div>
+                <div class="stat-value" id="oldestDate" style="font-size: 1em;">-</div>
+            </div>
+        </div>
+
+        <div class="gallery" id="gallery">
+            <div class="loading">Loading detections...</div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal" onclick="closeModal()">
+        <span class="close-modal">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <script>
+        let allDetections = [];
+
+        // Load detections on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDetections();
+        });
+
+        async function loadDetections() {
+            try {
+                const response = await fetch('/api/detections?limit=100');
+                const data = await response.json();
+
+                if (data.success) {
+                    allDetections = data.detections;
+                    displayDetections(data.detections);
+                    updateStats(data.stats);
+                } else {
+                    console.error('Failed to load detections:', data.error);
+                    document.getElementById('gallery').innerHTML =
+                        '<div class="no-detections"><div class="no-detections-icon">❌</div>Error loading detections</div>';
+                }
+            } catch (error) {
+                console.error('Error loading detections:', error);
+                document.getElementById('gallery').innerHTML =
+                    '<div class="no-detections"><div class="no-detections-icon">❌</div>Error loading detections</div>';
+            }
+        }
+
+        function displayDetections(detections) {
+            const gallery = document.getElementById('gallery');
+
+            if (detections.length === 0) {
+                gallery.innerHTML = `
+                    <div class="no-detections">
+                        <div class="no-detections-icon">📷</div>
+                        <div>No detections yet</div>
+                        <div style="font-size: 0.9em; margin-top: 10px;">
+                            Detection images will appear here when animals are detected
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            gallery.innerHTML = detections.map(detection => `
+                <div class="detection-card">
+                    <img
+                        src="/api/detections/${detection.filename}"
+                        alt="${detection.animal_type} detection"
+                        class="detection-image"
+                        onclick="openModal('/api/detections/${detection.filename}')"
+                    >
+                    <div class="detection-info">
+                        <div class="detection-header">
+                            <span class="animal-badge ${detection.animal_type}">
+                                ${detection.animal_type}
+                            </span>
+                            <div class="confidence">
+                                <span class="confidence-value">${(detection.confidence * 100).toFixed(0)}%</span>
+                            </div>
+                        </div>
+                        <div class="detection-time">
+                            📅 ${formatDateTime(detection.timestamp)}
+                        </div>
+                        <div class="detection-count">
+                            ${detection.detection_count} detection${detection.detection_count > 1 ? 's' : ''} in frame
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateStats(stats) {
+            document.getElementById('totalCount').textContent = stats.total || 0;
+            document.getElementById('deerCount').textContent = stats.by_animal?.deer || 0;
+            document.getElementById('cowCount').textContent = stats.by_animal?.cow || 0;
+            document.getElementById('sheepCount').textContent = stats.by_animal?.sheep || 0;
+
+            if (stats.newest) {
+                document.getElementById('newestDate').textContent = formatDate(stats.newest);
+            }
+            if (stats.oldest) {
+                document.getElementById('oldestDate').textContent = formatDate(stats.oldest);
+            }
+        }
+
+        function formatDateTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function openModal(imageSrc) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = 'block';
+            modalImg.src = imageSrc;
+        }
+
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+
+        // Close modal on ESC key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        async function deleteDetections() {
+            const filter = document.getElementById('deleteFilter').value;
+            const filterLabels = {
+                '10min': 'last 10 minutes',
+                'hour': 'last hour',
+                'day': 'last 24 hours',
+                'week': 'last week',
+                'month': 'last month',
+                'year': 'last year',
+                'all': 'all time'
+            };
+
+            if (!confirm(`Are you sure you want to delete detections from ${filterLabels[filter]}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/detections/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filter: filter })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✅ Deleted ${data.deleted} detection(s)`);
+                    loadDetections(); // Reload gallery
+                } else {
+                    alert(`❌ Error: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error deleting detections:', error);
+                alert('❌ Error deleting detections');
+            }
+        }
+    </script>
+</body>
+</html>

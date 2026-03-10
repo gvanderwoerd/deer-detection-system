@@ -4,7 +4,9 @@ Automated deer deterrent system using AI-powered object detection with ESP32-CAM
 
 ## System Overview
 
-When motion is detected by the Yard Sentinel, the ESP32-CAM wakes up and streams images to your desktop PC. YOLOv8 AI analyzes the video feed in real-time to detect deer. When a deer is identified, the system automatically activates your Tuya smart water valve to run the sprinkler for 60 seconds.
+The ESP32-CAM streams live video to your desktop PC via mDNS (accessible at `http://esp32cam.local:81/`). YOLOv8 AI analyzes the video feed in real-time to detect deer, cows, and sheep. When target animals are identified, the system automatically activates your Tuya smart water valve to run the sprinkler for 2 minutes.
+
+**Note**: Motion detection using HC-SR501 PIR sensor and deep sleep mode will be implemented in the next update.
 
 **Key Features:**
 - ✅ AI-powered deer detection (reduces false positives)
@@ -19,16 +21,18 @@ When motion is detected by the Yard Sentinel, the ESP32-CAM wakes up and streams
 
 ### Required:
 - **ESP32-CAM** module (AI-Thinker or compatible)
-- **USB-TTL programmer** (for ESP32-CAM upload)
-- **Yard Sentinel** motion detector (motion trigger)
-- **Tuya Smart Valve** (SM-AW713 or compatible)
+- **ESP32-CAM-MB** USB programmer board (for uploads and power)
+- **Tuya Smart Valve** (SM-SA713 or compatible) - 4 devices configured
 - **Desktop PC** (for AI processing and hosting)
-- **5V 2A power supply** for ESP32-CAM
+- **5V 2A power supply** for ESP32-CAM (external recommended for stability)
+
+### Coming Soon:
+- **HC-SR501 PIR** motion sensor (for motion-triggered operation)
 
 ### Optional:
 - Outdoor weatherproof enclosure
-- Wiring for Yard Sentinel → ESP32-CAM connection
 - Extension cables
+- Multiple ESP32-CAM units for coverage of different areas
 
 ## Software Components
 
@@ -67,8 +71,9 @@ nano config.py
 ```
 
 Update the following:
-- `ESP32_CAM_STREAM_URL` - Your ESP32-CAM IP address
-- WiFi credentials (reference only - enter in ESP32 code)
+- `ESP32_CAM_STREAM_URL` - Currently set to `http://esp32cam.local:81/` (mDNS)
+- WiFi credentials (reference only - already configured in ESP32 code)
+- Tuya Cloud API credentials (already configured)
 
 ### Step 2: Tuya Valve Configuration
 
@@ -94,36 +99,31 @@ python3 valve_control.py
 
 ### Step 3: ESP32-CAM Firmware
 
-1. Install ESP32 platform in PlatformIO:
+**Current firmware location:** `/mnt/linux-data/Arduino-Projects/esp32cam-test/`
+
+1. Edit `src/main.cpp` and update (if needed):
+   - `WIFI_SSID` - Currently: "CityWest_0090E24F"
+   - `WIFI_PASSWORD` - Already configured
+   - `MDNS_HOSTNAME` - Currently: "esp32cam" (accessible at http://esp32cam.local:81/)
+   - `STATIC_IP` - Currently: 192.168.1.100
+
+2. Connect ESP32-CAM to ESP32-CAM-MB programmer board
+
+3. Upload firmware:
 ```bash
-cd /mnt/linux-data/deer-detection-system/esp32-cam
-pio platform install espressif32
-```
-
-2. Edit `src/main.cpp` and update:
-   - `WIFI_SSID` - Your WiFi network name
-   - `WIFI_PASSWORD` - Your WiFi password
-
-3. Connect ESP32-CAM via USB-TTL programmer:
-   - ESP32 RX → TTL TX
-   - ESP32 TX → TTL RX
-   - ESP32 GND → TTL GND
-   - ESP32 5V → TTL 5V
-   - ESP32 GPIO 0 → GND (for programming mode)
-
-4. Upload firmware:
-```bash
+cd /mnt/linux-data/Arduino-Projects/esp32cam-test
 pio run --target upload
 ```
 
-5. Open serial monitor:
-```bash
-pio device monitor
-```
+**Note:** Serial output doesn't work on this ESP32-CAM hardware. Use LED patterns for status:
+- 3 blinks = Boot successful
+- 5 blinks = Camera initialized
+- 7 blinks = WiFi connected
+- Slow blink = Running normally
 
-6. Note the IP address displayed
-
-7. Update `server/config.py` with ESP32-CAM IP
+**Access camera:**
+- Via mDNS: `http://esp32cam.local:81/`
+- Via static IP: `http://192.168.1.100:81/`
 
 ### Step 4: Hardware Wiring
 
@@ -140,23 +140,29 @@ pio device monitor
 
 ### Starting the System
 
-1. Start the Python server:
+**Method 1: Desktop Launcher (Easiest)**
+- Double-click the **"Sprinkler Start"** icon on your desktop
+- Server starts automatically and browser opens to dashboard
+
+**Method 2: Command Line**
 ```bash
-cd /mnt/linux-data/deer-detection-system/server
-python3 main.py
+cd /mnt/linux-data/deer-detection-system
+./start.sh
 ```
 
-2. Open web interface in browser:
-```
-http://192.168.1.15:5000
-```
-
-Or from another device on your network:
-```
-http://<your-pc-ip>:5000
+**Stopping the System:**
+```bash
+cd /mnt/linux-data/deer-detection-system
+./stop.sh
 ```
 
-3. System is now armed and ready!
+**Access Dashboard:**
+- Local: `http://192.168.1.15:5000`
+- From other devices: `http://<your-pc-ip>:5000`
+
+### ESP32-CAM Access
+- **Via mDNS**: `http://esp32cam.local:81/` (recommended)
+- **Via IP**: `http://192.168.1.100:81/` (static IP fallback)
 
 ### Web Interface Controls
 
@@ -166,27 +172,31 @@ http://<your-pc-ip>:5000
 - **Test Sprinkler** - Manual 10-second test
 - **Manual Trigger** - Simulate motion detection
 
-### How It Works
+### How It Works (Current Implementation)
 
-1. **Motion Detected**: Yard Sentinel detects motion → sends signal to ESP32-CAM GPIO 13
-2. **Camera Wakes**: ESP32-CAM wakes from deep sleep, connects to WiFi
-3. **Streaming Starts**: Camera begins streaming to desktop PC
-4. **AI Analysis**: YOLOv8 processes each frame looking for deer (class ID 23)
-5. **Deer Detected**: If deer found with confidence >0.5 → activate sprinkler
-6. **Sprinkler ON**: Valve opens for 60 seconds
-7. **Cooldown**: System waits 2 minutes before allowing another activation
-8. **Sleep**: After 5 minutes of no motion, ESP32-CAM returns to deep sleep
+1. **Camera Streaming**: ESP32-CAM continuously streams video via WiFi to desktop PC
+2. **Server Connection**: Server automatically connects to `http://esp32cam.local:81/`
+3. **AI Analysis**: YOLOv8 processes each frame looking for deer (class 23), cows (class 21), sheep (class 19)
+4. **Target Detected**: If target animal found with confidence >0.25 → activate sprinkler
+5. **Sprinkler ON**: Primary valve opens for 2 minutes (120 seconds)
+6. **Cooldown**: System waits 2 minutes before allowing another activation
+7. **Session Limits**: Maximum 3 activations per 10-minute session
+8. **Safety Check**: Never activates if person (class 0) is detected in frame
+
+**Coming Soon:** HC-SR501 PIR motion sensor will trigger ESP32-CAM to wake from deep sleep, conserving power.
 
 ## Configuration Options
 
 Edit `server/config.py` to customize:
 
 ```python
-DETECTION_CONFIDENCE = 0.5          # Detection threshold (0.3-0.7)
-ACTIVE_WINDOW_SECONDS = 300         # How long to scan (5 minutes)
-SPRINKLER_DURATION_SECONDS = 60     # Spray duration
-COOLDOWN_PERIOD_SECONDS = 120       # Wait between activations
-MAX_DETECTIONS_PER_SESSION = 3      # Max sprinkler activations per session
+DETECTION_CONFIDENCE = 0.25          # Detection threshold (0.2-0.7) - lowered for testing
+ACTIVE_WINDOW_SECONDS = 600          # Session duration (10 minutes)
+SPRINKLER_DURATION_SECONDS = 120     # Spray duration (2 minutes)
+COOLDOWN_PERIOD_SECONDS = 120        # Wait between activations (2 minutes)
+MAX_DETECTIONS_PER_SESSION = 3       # Max sprinkler activations per session
+TARGET_CLASS_IDS = [23, 21, 19]      # Deer, cow, sheep
+ESP32_CAM_STREAM_URL = 'http://esp32cam.local:81/'  # mDNS hostname
 ```
 
 ## Troubleshooting
@@ -199,10 +209,12 @@ MAX_DETECTIONS_PER_SESSION = 3      # Max sprinkler activations per session
 - Check signal strength (ESP32 needs good WiFi signal)
 
 **Camera feed not showing:**
-- Verify ESP32-CAM IP address
-- Update `ESP32_CAM_STREAM_URL` in `config.py`
+- Test mDNS: `ping esp32cam.local`
+- Test static IP: `ping 192.168.1.100`
+- Test stream directly: `http://esp32cam.local:81/`
+- Check `ESP32_CAM_STREAM_URL` in `config.py` (should be `http://esp32cam.local:81/`)
 - Check firewall settings
-- Test stream directly: `http://<esp32-ip>:81/stream`
+- Verify ESP32-CAM is powered with 5V 2A supply
 
 **Camera crashes/reboots:**
 - Use stable 5V 2A power supply

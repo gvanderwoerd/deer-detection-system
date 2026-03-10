@@ -9,6 +9,9 @@ NC='\033[0m'
 
 echo -e "${YELLOW}Stopping Deer Detection System...${NC}"
 
+# Navigate to project directory
+cd "$(dirname "$0")"
+
 if lsof -Pi :5000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
     PID=$(lsof -ti:5000)
     echo -e "${YELLOW}Killing server (PID: $PID)...${NC}"
@@ -17,10 +20,14 @@ if lsof -Pi :5000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
 
     if ! lsof -Pi :5000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
         echo -e "${GREEN}✓ Server stopped successfully${NC}"
+        # Clean up PID file
+        rm -f server.pid
     else
         echo -e "${RED}✗ Failed to stop server${NC}"
         exit 1
     fi
 else
     echo -e "${YELLOW}No server running on port 5000${NC}"
+    # Clean up stale PID file if it exists
+    rm -f server.pid
 fi

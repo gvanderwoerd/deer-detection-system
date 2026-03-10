@@ -3,7 +3,7 @@
 # === Network Configuration ===
 SERVER_HOST = '0.0.0.0'  # Listen on all interfaces
 SERVER_PORT = 5000
-ESP32_CAM_STREAM_URL = 'http://192.168.1.16:81/stream'  # ESP32-CAM IP
+ESP32_CAM_STREAM_URL = 'http://esp32cam.local:81/'  # ESP32-CAM via mDNS (hostname)
 
 # === Detection Configuration ===
 DETECTION_CONFIDENCE = 0.25  # Confidence threshold (0.0-1.0) - lowered for testing
@@ -12,8 +12,8 @@ PERSON_CLASS_ID = 0  # COCO: person=0 (safety check - never activate with people
 MODEL_PATH = 'yolov8n.pt'  # YOLOv8 nano model
 
 # === System Behavior ===
-ACTIVE_WINDOW_SECONDS = 300  # 5 minutes after motion detected
-SPRINKLER_DURATION_SECONDS = 60  # Sprinkler runs for 60 seconds
+ACTIVE_WINDOW_SECONDS = 600  # 10 minutes after motion detected (ESP32-CAM awake time)
+SPRINKLER_DURATION_SECONDS = 120  # Sprinkler runs for 2 minutes
 COOLDOWN_PERIOD_SECONDS = 120  # Wait 2 minutes between activations
 MAX_DETECTIONS_PER_SESSION = 3  # Max times to activate sprinkler in one session
 

@@ -4,6 +4,7 @@ Main application - Flask server with WebSocket for real-time updates
 """
 
 import logging
+from logging.handlers import RotatingFileHandler
 import time
 from datetime import datetime
 from enum import Enum
@@ -18,6 +19,7 @@ import threading
 
 from detection import DeerDetector
 from valve_control_cloud import CloudValveController as ValveController
+from detection_storage import get_detection_storage
 from config import (
     SERVER_HOST,
     SERVER_PORT,
@@ -30,14 +32,56 @@ from config import (
     MAX_LOG_ENTRIES
 )
 
-# Configure logging
+# Configure smart logging with rotation
+class SmartErrorFilter(logging.Filter):
+    """Filter to reduce repetitive error spam"""
+    def __init__(self):
+        super().__init__()
+        self.consecutive_errors = 0
+        self.last_error_msg = None
+
+    def filter(self, record):
+        # Always allow non-ERROR messages
+        if record.levelno != logging.ERROR:
+            self.consecutive_errors = 0
+            self.last_error_msg = None
+            return True
+
+        # Check for repetitive frame capture errors
+        if "Frame capture error" in record.getMessage():
+            if record.getMessage() == self.last_error_msg:
+                self.consecutive_errors += 1
+                # Log first error, then every 100th repetition
+                if self.consecutive_errors == 1 or self.consecutive_errors % 100 == 0:
+                    record.msg = f"{record.msg} [Error repeated {self.consecutive_errors} times]"
+                    return True
+                return False
+            else:
+                self.consecutive_errors = 1
+                self.last_error_msg = record.getMessage()
+                return True
+
+        # Allow all other errors
+        return True
+
+# Set up logging with rotation (5MB per file, keep 4 backups = ~20MB max)
+file_handler = RotatingFileHandler(
+    LOG_FILE,
+    maxBytes=5*1024*1024,  # 5MB per file
+    backupCount=4          # Keep 4 backups (20MB total)
+)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+file_handler.addFilter(SmartErrorFilter())
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+# Configure root logger
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler()
-    ]
+    handlers=[file_handler, console_handler]
 )
 logger = logging.getLogger(__name__)
 
@@ -88,6 +132,8 @@ class DeerDetectionSystem:
         self.stream_thread = None
         self.frame_lock = threading.Lock()
         self.show_detections = True  # Always show detection overlays
+        self.last_frame_time = None  # Track when frames are received
+        self.auto_detection_active = False  # Track if auto-detection is running
 
         # Start continuous frame capture
         self._start_frame_capture()
@@ -98,10 +144,15 @@ class DeerDetectionSystem:
         """Start continuous frame capture from ESP32-CAM"""
         def capture_worker():
             logger.info("Starting continuous frame capture thread")
+            connection_attempts = 0
             while True:
                 try:
-                    logger.info("Connecting to ESP32-CAM stream...")
+                    connection_attempts += 1
+                    # Only log every 10th connection attempt (reduce noise)
+                    if connection_attempts == 1 or connection_attempts % 10 == 0:
+                        logger.debug(f"Connecting to ESP32-CAM stream (attempt {connection_attempts})...")
                     stream = requests.get(ESP32_CAM_STREAM_URL, stream=True, timeout=10)
+                    connection_attempts = 0  # Reset on successful connection
                     bytes_buffer = b''
                     frame_count = 0
 
@@ -122,20 +173,58 @@ class DeerDetectionSystem:
                                 with self.frame_lock:
                                     self.current_frame = frame
                                     self.current_jpg = jpg
+
+                                    # Auto-trigger detection when camera becomes active
+                                    now = time.time()
+                                    if self.last_frame_time is None:
+                                        # Camera just woke up!
+                                        logger.info("📷 ESP32-CAM stream active - AUTO-STARTING detection")
+                                        self.stream_active = True
+                                        socketio.emit('camera_status', {'active': True})
+                                        # Auto-trigger motion detection
+                                        if not self.auto_detection_active and self.enabled:
+                                            self.auto_detection_active = True
+                                            threading.Thread(target=self._auto_trigger_detection, daemon=True).start()
+
+                                    self.last_frame_time = now
+
                                 frame_count += 1
 
-                                if frame_count % 100 == 0:
-                                    logger.info(f"Captured {frame_count} frames")
+                                # Only log every 1000 frames (reduced noise)
+                                if frame_count % 1000 == 0:
+                                    logger.debug(f"Captured {frame_count} frames (streaming active)")
 
                 except Exception as e:
                     logger.error(f"Frame capture error: {e}")
                     with self.frame_lock:
                         self.current_frame = None
                         self.current_jpg = None
+                        # Mark camera as inactive
+                        if self.stream_active:
+                            logger.info("📷 ESP32-CAM went to sleep")
+                            self.stream_active = False
+                            self.last_frame_time = None
+                            socketio.emit('camera_status', {'active': False})
                     time.sleep(5)  # Wait before reconnecting
 
         thread = threading.Thread(target=capture_worker, daemon=True)
         thread.start()
+
+    def _auto_trigger_detection(self):
+        """Automatically trigger detection when camera wakes up"""
+        try:
+            # Small delay to ensure stream is stable
+            time.sleep(1)
+
+            logger.info("🎯 Auto-triggering detection session (ESP32-CAM active)")
+            if self.trigger_motion():
+                logger.info("✅ Auto-detection session started")
+            else:
+                logger.warning("⚠️ Auto-trigger ignored (system disabled or in cooldown)")
+        except Exception as e:
+            logger.error(f"Auto-trigger error: {e}")
+        finally:
+            self.auto_detection_active = False
 
     def log_event(self, event_type, message, data=None):
         """Log an event"""
@@ -217,7 +306,7 @@ class DeerDetectionSystem:
                             self.annotated_jpg = buffer.tobytes()
 
                     if deer_detected:
-                        self._handle_deer_detection(detections)
+                        self._handle_deer_detection(detections, annotated_frame)
                 else:
                     # Log when no frame is available
                     if frame_check_count % 20 == 0:
@@ -233,30 +322,35 @@ class DeerDetectionSystem:
         thread = threading.Thread(target=session_worker, daemon=True)
         thread.start()
 
-    def _handle_deer_detection(self, detections):
+    def _handle_deer_detection(self, detections, annotated_frame):
         """Handle target animal detection (deer, cow, sheep)"""
+        animal_type = detections[0]['class']
+
+        # ALWAYS save detection image (even if we don't activate)
+        storage = get_detection_storage()
+        saved_filename = storage.save_detection(annotated_frame, detections, animal_type)
+        logger.info(f"📸 Detection image saved: {saved_filename}")
+
         # Check if we've hit the max detections for this session
         if self.session_detections >= MAX_DETECTIONS_PER_SESSION:
-            animal_type = detections[0]['class']
             self.log_event('detection', f"{animal_type.capitalize()} detected but max activations reached ({MAX_DETECTIONS_PER_SESSION})")
             return
 
         # Check cooldown
         if self.cooldown_until and time.time() < self.cooldown_until:
             remaining = int(self.cooldown_until - time.time())
-            animal_type = detections[0]['class']
             self.log_event('detection', f"{animal_type.capitalize()} detected but in cooldown ({remaining}s remaining)")
             return
 
         # Activate sprinkler
         self.session_detections += 1
         self.last_detection_time = datetime.now()
-        animal_type = detections[0]['class']
 
         self.log_event('detection', f"{animal_type.capitalize()} detected! (confidence: {detections[0]['confidence']:.2f})", {
             'animal': animal_type,
             'detections': len(detections),
-            'session_count': self.session_detections
+            'session_count': self.session_detections,
+            'image': saved_filename
         })
 
         self.change_state(SystemState.DEER_DETECTED)
@@ -321,7 +415,8 @@ class DeerDetectionSystem:
             'session_active': self.session_start is not None,
             'session_detections': self.session_detections,
             'last_detection': self.last_detection_time.isoformat() if self.last_detection_time else None,
-            'cooldown_remaining': max(0, int(self.cooldown_until - time.time())) if self.cooldown_until else 0
+            'cooldown_remaining': max(0, int(self.cooldown_until - time.time())) if self.cooldown_until else 0,
+            'camera_active': self.stream_active  # Add camera status
         }
 
 
@@ -434,6 +529,8 @@ def handle_connect():
     """Client connected"""
     logger.info("Client connected")
     emit('status', system.get_status())
+    # Send initial camera status so UI knows if camera is active
+    emit('camera_status', {'active': system.stream_active})
 
 
 @socketio.on('disconnect')
@@ -531,15 +628,107 @@ def emergency_stop_all_devices():
     try:
         dm = get_device_manager()
         results = dm.emergency_stop_all()
-        
+
         socketio.emit('log_event', {
             'message': '🚨 EMERGENCY STOP - All devices turned off',
             'level': 'warning'
         })
-        
+
         return jsonify({'success': True, 'results': results})
     except Exception as e:
         logger.error(f"Error in emergency stop: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ===== Detection Gallery Routes =====
+
+@app.route('/detections')
+def detections_page():
+    """Serve the detection gallery page"""
+    return app.send_static_file('detections.html')
+
+
+@app.route('/api/detections', methods=['GET'])
+def api_get_detections():
+    """Get list of detection records"""
+    try:
+        storage = get_detection_storage()
+
+        # Get pagination parameters
+        limit = request.args.get('limit', type=int, default=50)
+        offset = request.args.get('offset', type=int, default=0)
+
+        # Get detections
+        detections = storage.get_detections(limit=limit, offset=offset)
+        stats = storage.get_detection_stats()
+
+        return jsonify({
+            'success': True,
+            'detections': detections,
+            'stats': stats,
+            'limit': limit,
+            'offset': offset
+        })
+    except Exception as e:
+        logger.error(f"Error getting detections: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/detections/<filename>')
+def api_get_detection_image(filename):
+    """Serve a detection image"""
+    try:
+        from flask import send_from_directory
+        storage = get_detection_storage()
+        image_path = storage.get_detection_image_path(filename)
+
+        if image_path.exists():
+            detections_dir = str(image_path.parent)
+            return send_from_directory(detections_dir, filename)
+        else:
+            return jsonify({'error': 'Image not found'}), 404
+    except Exception as e:
+        logger.error(f"Error serving image {filename}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/detections/delete', methods=['POST'])
+def api_delete_detections():
+    """Delete detections based on age filter"""
+    try:
+        data = request.json
+        age_filter = data.get('filter', 'all')
+
+        # Validate filter
+        valid_filters = ['all', 'year', 'month', 'week', 'day', 'hour', '10min']
+        if age_filter not in valid_filters:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid filter. Must be one of: {valid_filters}'
+            }), 400
+
+        storage = get_detection_storage()
+        deleted_count = storage.delete_detections_by_age(age_filter)
+
+        return jsonify({
+            'success': True,
+            'deleted': deleted_count,
+            'message': f'Deleted {deleted_count} detection(s) (filter: {age_filter})'
+        })
+    except Exception as e:
+        logger.error(f"Error deleting detections: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/detections/stats', methods=['GET'])
+def api_detection_stats():
+    """Get detection statistics"""
+    try:
+        storage = get_detection_storage()
+        stats = storage.get_detection_stats()
+        return jsonify({'success': True, 'stats': stats})
+    except Exception as e:
+        logger.error(f"Error getting stats: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
