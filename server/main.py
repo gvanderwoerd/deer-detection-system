@@ -220,7 +220,7 @@ class DeerDetectionSystem:
 
     def _draw_timestamp(self, frame):
         """Draw date/time overlay on the frame (bottom-left)"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
         
         # Text settings
         font = cv2.FONT_HERSHEY_SIMPLEX
