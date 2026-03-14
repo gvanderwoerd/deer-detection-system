@@ -46,6 +46,7 @@ Automated animal detection system that activates SmartLife valves to deter deer,
    - ESP32-CAM streaming successfully
    - Continuous frame capture
    - Automatic reconnection on disconnect
+   - **Live Timestamp Overlay**: Real-time clock baked into the video feed and saved detections
 
 2. **AI Detection**
    - YOLOv8n detecting deer, cows, sheep in real-time

@@ -2,6 +2,12 @@
 
 ## 2026-03-14 - Cloud API Resilience & UI Robustness
 
+### Live Timestamp Overlay (NEW)
+- ✅ Implemented real-time date and time overlay on the camera feed
+- ✅ Timestamp is baked into the "clean" frame, ensuring it appears on the live dashboard
+- ✅ Automatic inclusion of the exact detection time in all images saved to the gallery
+- ✅ High-readability design with semi-transparent background box in the bottom-left corner
+
 ### Low-Quota Optimization (NEW)
 - ✅ Reduced Cloud API polling from 30 seconds to **1 hour**
 - ✅ Implemented **Status Caching** in `DeviceManager` to prevent API spam from dashboard

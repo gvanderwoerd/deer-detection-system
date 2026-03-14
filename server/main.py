@@ -170,9 +170,17 @@ class DeerDetectionSystem:
                             frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
 
                             if frame is not None:
+                                # Add date/time overlay BEFORE storing
+                                # This ensures both live feed and saved gallery images have the timestamp
+                                self._draw_timestamp(frame)
+                                
+                                # Re-encode to JPEG for the live feed (this puts the timestamp on the screen)
+                                _, stamped_buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                stamped_jpg = stamped_buffer.tobytes()
+
                                 with self.frame_lock:
                                     self.current_frame = frame
-                                    self.current_jpg = jpg
+                                    self.current_jpg = stamped_jpg
 
                                     # Auto-trigger detection when camera becomes active
                                     now = time.time()
@@ -209,6 +217,30 @@ class DeerDetectionSystem:
 
         thread = threading.Thread(target=capture_worker, daemon=True)
         thread.start()
+
+    def _draw_timestamp(self, frame):
+        """Draw date/time overlay on the frame (bottom-left)"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Text settings
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 0.65
+        thickness = 2
+        color = (255, 255, 255) # White
+        
+        # Calculate text size for background box
+        (text_width, text_height), baseline = cv2.getTextSize(timestamp, font, scale, thickness)
+        
+        # Position: Bottom-left
+        x, y = 10, frame.shape[0] - 10
+        
+        # Draw semi-transparent background box for readability
+        padding = 5
+        cv2.rectangle(frame, (x - padding, y - text_height - padding), 
+                      (x + text_width + padding, y + padding), (0, 0, 0), -1)
+        
+        # Draw text with anti-aliasing
+        cv2.putText(frame, timestamp, (x, y), font, scale, color, thickness, cv2.LINE_AA)
 
     def _auto_trigger_detection(self):
         """Automatically trigger detection when camera wakes up"""
