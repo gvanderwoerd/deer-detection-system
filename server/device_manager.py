@@ -24,7 +24,7 @@ class DeviceManager:
         )
         self.devices = {}  # device_id -> device_info
         self.device_status = {}  # device_id -> status
-        self.refresh_interval = 30  # seconds
+        self.refresh_interval = 3600  # seconds (1 hour) - reduce Cloud API usage
         self.monitor_thread = None
         self.stop_monitoring = False
         self.last_error = None
@@ -33,9 +33,9 @@ class DeviceManager:
         self.refresh_devices()
 
     def refresh_devices(self):
-        """Discover all devices from SmartLife"""
+        """Discover all devices from SmartLife and refresh their status"""
         try:
-            logger.info("Discovering SmartLife devices...")
+            logger.info("Refreshing device list and status from Cloud API...")
             
             # Do a quick connection status check on the primary valve to detect quota errors early
             try:
@@ -52,6 +52,8 @@ class DeviceManager:
             device_list = self.cloud.getdevices()
 
             if isinstance(device_list, list):
+                # Backup existing status for missing devices
+                old_status = self.device_status.copy()
                 self.devices = {}
                 for device in device_list:
                     device_id = device['id']
@@ -66,11 +68,11 @@ class DeviceManager:
                     }
 
                 logger.info(f"Discovered {len(self.devices)} devices")
-                for dev_id, dev in self.devices.items():
-                    logger.info(f"  - {dev['name']} ({dev['model']}) - {'Online' if dev['online'] else 'Offline'}")
 
-                # Get initial status for all devices
-                self.refresh_all_status()
+                # Get FRESH status for all devices (this is the expensive part)
+                for device_id in self.devices.keys():
+                    self.get_device_status(device_id, force_refresh=True)
+                
                 return True
             else:
                 logger.error(f"Device discovery failed: {device_list}")
@@ -81,13 +83,20 @@ class DeviceManager:
             return False
 
     def refresh_all_status(self):
-        """Refresh status for all devices"""
+        """Force refresh status for all devices from Cloud API"""
         for device_id in self.devices.keys():
-            self.get_device_status(device_id)
+            self.get_device_status(device_id, force_refresh=True)
 
-    def get_device_status(self, device_id: str) -> Dict:
-        """Get current status of a device"""
+    def get_device_status(self, device_id: str, force_refresh: bool = False) -> Dict:
+        """Get status of a device - defaults to CACHED status to save API calls"""
+        # Return cached status if available and not forcing a refresh
+        if not force_refresh and device_id in self.device_status:
+            return self.device_status[device_id]
+
         try:
+            # Hit the Cloud API only if forced or missing
+            # logger.debug(f"HITTING CLOUD API for status of {device_id}...")
+            
             # Check if device is actually online using getconnectstatus()
             is_online = False
             api_error = None
@@ -98,6 +107,7 @@ class DeviceManager:
                 err_str = str(e).lower()
                 if "quota" in err_str or "trial" in err_str or "28841004" in err_str or "'result'" in err_str:
                     api_error = "Cloud API Quota Exceeded"
+                    self.last_error = api_error
                 logger.warning(f"Could not get connection status for {device_id}: {e}")
                 is_online = False
 

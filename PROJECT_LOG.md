@@ -63,6 +63,8 @@ Automated animal detection system that activates SmartLife valves to deter deer,
 4. **SmartLife Valve Integration & Resilience** ✨ UPDATED
    - **Tuya Cloud API fully configured**
    - Multi-device discovery and management
+   - **Low-Quota Mode**: Polling reduced to 1-hour intervals to save API tokens
+   - **Status Caching**: Dashboard uses cached data, eliminating background API spam
    - **Cloud API Resilience**: Automatic detection of quota limits
    - **Dynamic Error Reporting**: "API Error" status in dashboard
    - Multi-device control (on/off/test) with emergency stop

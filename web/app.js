@@ -56,7 +56,8 @@ function initElements() {
         btnToggleCamera: document.getElementById('btn-toggle-camera'),
         btnStopSprinkler: document.getElementById('btn-stop-sprinkler'),
         btnTestSprinkler: document.getElementById('btn-test-sprinkler'),
-        btnTriggerMotion: document.getElementById('btn-trigger-motion')
+        btnTriggerMotion: document.getElementById('btn-trigger-motion'),
+        btnCloudSync: document.getElementById('btn-cloud-sync')
     };
     console.log('[DEBUG] UI Elements initialized');
 }
@@ -389,6 +390,32 @@ function setupEventListeners() {
             const result = await apiCall('/trigger', 'POST');
             if (!result.success) {
                 addLogEntry('warning', result.message || 'Trigger ignored');
+            }
+        });
+    }
+
+    if (elements.btnCloudSync) {
+        elements.btnCloudSync.addEventListener('click', async () => {
+            addLogEntry('system', '☁️ Requesting Cloud API Status Sync...');
+            elements.btnCloudSync.disabled = true;
+            elements.btnCloudSync.textContent = '⏳ Syncing...';
+            
+            try {
+                const result = await apiCall('/api/devices/refresh', 'POST');
+                if (result.success) {
+                    addLogEntry('success', '✅ Cloud Status Synced Successfully');
+                    if (result.api_error) {
+                        addLogEntry('error', `Cloud Error: ${result.api_error}`);
+                    }
+                } else {
+                    addLogEntry('error', `Cloud Sync Failed: ${result.error || 'Unknown error'}`);
+                }
+            } catch (e) {
+                addLogEntry('error', `Cloud Sync Error: ${e.message}`);
+            } finally {
+                elements.btnCloudSync.disabled = false;
+                elements.btnCloudSync.textContent = '🔄 Sync Valve Status (Cloud)';
+                pollStatus(); // Immediate refresh of UI
             }
         });
     }

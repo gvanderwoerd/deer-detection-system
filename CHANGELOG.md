@@ -2,6 +2,12 @@
 
 ## 2026-03-14 - Cloud API Resilience & UI Robustness
 
+### Low-Quota Optimization (NEW)
+- ✅ Reduced Cloud API polling from 30 seconds to **1 hour**
+- ✅ Implemented **Status Caching** in `DeviceManager` to prevent API spam from dashboard
+- ✅ Added manual **"Sync Valve Status (Cloud)"** buttons to main dashboard and device manager
+- ✅ Mathematical reduction in API tokens: ~28,800/day reduced to ~720/month (99.9% reduction)
+
 ### Cloud API Error Handling (NEW)
 - ✅ Implemented Tuya Cloud API quota detection (28841004 / 'trial' errors)
 - ✅ `DeviceManager` now tracks and reports `last_error` to the frontend

@@ -216,7 +216,7 @@
             <h1>🏠 SmartLife Devices</h1>
             <p>Deer Detection System - Device Management</p>
             <div class="header-controls">
-                <button class="btn btn-primary" onclick="refreshDevices()">🔄 Refresh Devices</button>
+                <button class="btn btn-warning" onclick="refreshDevices()" title="Forces a status check from Tuya Cloud API. Use sparingly to save API quota.">🔄 Sync Status (Cloud)</button>
                 <button class="btn btn-danger" onclick="emergencyStopAll()">🚨 EMERGENCY STOP ALL</button>
                 <button class="btn btn-primary" onclick="window.location.href='/'">📹 Back to Dashboard</button>
             </div>

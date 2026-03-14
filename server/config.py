@@ -19,7 +19,7 @@ MAX_DETECTIONS_PER_SESSION = 3  # Max times to activate sprinkler in one session
 
 # === Tuya Cloud API Configuration ===
 TUYA_CLOUD_API_KEY = "rqwuq7sgvv57f745g5m8"
-TUYA_CLOUD_API_SECRET = "f64c246ade9f45cf9c4217851deceddc"
+TUYA_CLOUD_API_SECRET = "e75337eab5e74a56844e7d2891aaa676"
 TUYA_CLOUD_REGION = "us"
 
 # Primary valve for deer detection system
