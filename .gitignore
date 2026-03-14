@@ -28,6 +28,7 @@ logs/
 *.backup.*
 *.bak
 *.old
+backups/
 
 # Detection images (generated at runtime)
 server/detections/*.jpg

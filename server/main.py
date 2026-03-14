@@ -412,6 +412,7 @@ class DeerDetectionSystem:
             'enabled': self.enabled,
             'valve_on': valve_status.get('is_on', False),
             'valve_configured': valve_status.get('configured', False),
+            'valve_api_error': valve_status.get('api_error'),
             'session_active': self.session_start is not None,
             'session_detections': self.session_detections,
             'last_detection': self.last_detection_time.isoformat() if self.last_detection_time else None,
@@ -425,6 +426,26 @@ system = DeerDetectionSystem()
 
 
 # ===== Flask Routes =====
+
+@app.route('/api/client_log', methods=['POST'])
+def client_log():
+    """Endpoint for client-side logging"""
+    try:
+        data = request.json
+        level = data.get('level', 'info').lower()
+        message = data.get('message', '')
+        
+        client_logger = logging.getLogger('client')
+        if level == 'error':
+            client_logger.error(f"Client Error: {message}")
+        elif level == 'warning':
+            client_logger.warning(f"Client Warning: {message}")
+        else:
+            client_logger.info(f"Client Log: {message}")
+            
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/')
 def index():
@@ -553,7 +574,10 @@ def get_devices():
     try:
         dm = get_device_manager()
         devices = dm.get_all_devices()
-        return jsonify({'success': True, 'devices': devices})
+        response = {'success': True, 'devices': devices}
+        if dm.last_error:
+            response['api_error'] = dm.last_error
+        return jsonify(response)
     except Exception as e:
         logger.error(f"Error getting devices: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -565,7 +589,10 @@ def refresh_devices():
         dm = get_device_manager()
         success = dm.refresh_devices()
         devices = dm.get_all_devices()
-        return jsonify({'success': success, 'devices': devices})
+        response = {'success': success, 'devices': devices}
+        if dm.last_error:
+            response['api_error'] = dm.last_error
+        return jsonify(response)
     except Exception as e:
         logger.error(f"Error refreshing devices: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -33,5 +33,6 @@ class CloudValveController:
             'success': True,
             'is_on': status.get('is_on', False),
             'configured': True,
-            'online': status.get('online', False)
+            'online': status.get('online', False),
+            'api_error': status.get('api_error')
         }

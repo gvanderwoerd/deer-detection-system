@@ -1,5 +1,26 @@
 # Deer Detection System - Changelog
 
+## 2026-03-14 - Cloud API Resilience & UI Robustness
+
+### Cloud API Error Handling (NEW)
+- ✅ Implemented Tuya Cloud API quota detection (28841004 / 'trial' errors)
+- ✅ `DeviceManager` now tracks and reports `last_error` to the frontend
+- ✅ Automatic detection of "Cloud API Quota Exceeded" for easier troubleshooting
+- ✅ Added `server/test_tuya.py` utility for quick API connectivity tests
+
+### Remote Client-Side Logging (NEW)
+- ✅ New server endpoint `/api/client_log` to capture frontend errors
+- ✅ JS errors and key events are now automatically forwarded to server logs
+- ✅ Easier debugging of mobile or remote dashboard issues
+- ✅ Real-time server-side insight into client-side JS state
+
+### UI Resilience & Diagnostic Enhancements
+- ✅ Full refactor of `app.js` initialization to prevent race conditions
+- ✅ Implemented "Failsafe Heartbeat" (inline JS indicators) in `index.html`
+- ✅ Dynamic "API Error" status badges for valves when quotas are hit
+- ✅ Enhanced error reporting on the Devices management page
+- ✅ Version-bumped `app.js?v=10` to force cache refresh
+
 ## 2026-03-09 - Detection Gallery & Smart Logging
 
 ### Detection Storage System (NEW)

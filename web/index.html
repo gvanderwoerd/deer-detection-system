@@ -108,8 +108,20 @@
         </footer>
     </div>
 
+    <!-- Failsafe Heartbeat -->
+    <script>
+        console.log('Inline heartbeat starting...');
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusEl = document.getElementById('system-status');
+            if (statusEl) {
+                statusEl.textContent = 'Inline JS Active...';
+                statusEl.style.backgroundColor = '#4CAF50';
+            }
+        });
+    </script>
+
     <!-- Include Socket.IO client -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=10"></script>
 </body>
 </html>

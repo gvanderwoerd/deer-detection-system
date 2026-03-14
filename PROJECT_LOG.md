@@ -1,8 +1,8 @@
 # Deer Detection Sprinkler System - Project Log
 
 **Date Started:** 2026-02-14
-**Status:** ✅ **FULLY OPERATIONAL** - Multi-device SmartLife integration complete
-**Last Updated:** 2026-02-16 13:10
+**Status:** ✅ **FULLY OPERATIONAL** - Detection Gallery & Cloud API Resilience Active
+**Last Updated:** 2026-03-14 14:10
 
 ---
 
@@ -38,7 +38,7 @@ Automated animal detection system that activates SmartLife valves to deter deer,
 
 ---
 
-## ✅ Current System Status (2026-02-16)
+## ✅ Current System Status (2026-03-14)
 
 ### Fully Operational Features
 
@@ -53,34 +53,31 @@ Automated animal detection system that activates SmartLife valves to deter deer,
    - Processes ~2 frames/second during active detection
    - **Safety check: Never activates if person detected**
 
-3. **SmartLife Valve Integration** ✨ NEW
+3. **Detection Gallery & Storage** ✨ NEW (2026-03-09)
+   - **Automatic Image Capture**: Saves JPEG of all detections
+   - **JSON Metadata**: Records timestamp, confidence, animal type
+   - **Gallery Interface (/detections)**: Card-based view of all captures
+   - **Stats Dashboard**: Total detections by type and date
+   - **Retention Management**: Automatic deletion of old captures
+
+4. **SmartLife Valve Integration & Resilience** ✨ UPDATED
    - **Tuya Cloud API fully configured**
    - Multi-device discovery and management
-   - Accurate online/offline status tracking
-   - Individual device control (on/off/test)
-   - Emergency stop all functionality
-   - Auto-refresh every 30 seconds
+   - **Cloud API Resilience**: Automatic detection of quota limits
+   - **Dynamic Error Reporting**: "API Error" status in dashboard
+   - Multi-device control (on/off/test) with emergency stop
 
-4. **Web Dashboards**
-   - **Main Dashboard** (/)
-     - Live video with detection overlays
-     - System status (Armed, Active, Sprinkler On, Cooldown)
-     - Event log with timestamps
-     - Manual controls
-   - **Device Manager** (/devices) ✨ NEW
-     - Real-time status for all 4 SmartLife valves
-     - Online/offline indicators
-     - Individual on/off controls
-     - 10-second test function
-     - Emergency stop all button
-     - Auto-refresh every 10 seconds
+5. **Web Dashboards & Diagnostic System** ✨ UPDATED
+   - **Main Dashboard (/)**: Live video, status indicators, and event log
+   - **Device Manager (/devices)**: Real-time valve status and control
+   - **Detection Gallery (/detections)**: Review historical detection images
+   - **Remote Logging**: Client-side JS errors captured on server
+   - **Failsafe Indicators**: Inline JS heartbeat for troubleshooting
 
-5. **Easy Startup** ✨ NEW
-   - **./start.sh** - One command to launch system
-   - **./stop.sh** - Clean shutdown
-   - Automatic dependency management
-   - Virtual environment setup
-   - Server health checking
+6. **Easy Startup & Management**
+   - **./start.sh** / **./stop.sh** for easy lifecycle management
+   - Automatic log rotation (20MB total max)
+   - Virtual environment dependency management
 
 ---
 

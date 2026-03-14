@@ -27,6 +27,7 @@ class DeviceManager:
         self.refresh_interval = 30  # seconds
         self.monitor_thread = None
         self.stop_monitoring = False
+        self.last_error = None
 
         # Initial device discovery
         self.refresh_devices()
@@ -35,6 +36,19 @@ class DeviceManager:
         """Discover all devices from SmartLife"""
         try:
             logger.info("Discovering SmartLife devices...")
+            
+            # Do a quick connection status check on the primary valve to detect quota errors early
+            try:
+                from config import PRIMARY_VALVE_ID
+                self.cloud.getconnectstatus(PRIMARY_VALVE_ID)
+                self.last_error = None
+            except Exception as e:
+                err_str = str(e).lower()
+                if "quota" in err_str or "trial" in err_str or "28841004" in err_str or "'result'" in err_str:
+                    self.last_error = "Cloud API Quota Exceeded"
+                else:
+                    self.last_error = str(e)
+            
             device_list = self.cloud.getdevices()
 
             if isinstance(device_list, list):
@@ -76,10 +90,14 @@ class DeviceManager:
         try:
             # Check if device is actually online using getconnectstatus()
             is_online = False
+            api_error = None
             try:
                 connect_status = self.cloud.getconnectstatus(device_id)
                 is_online = bool(connect_status)
             except Exception as e:
+                err_str = str(e).lower()
+                if "quota" in err_str or "trial" in err_str or "28841004" in err_str or "'result'" in err_str:
+                    api_error = "Cloud API Quota Exceeded"
                 logger.warning(f"Could not get connection status for {device_id}: {e}")
                 is_online = False
 
@@ -102,6 +120,7 @@ class DeviceManager:
             status = {
                 'online': is_online,
                 'is_on': is_on,
+                'api_error': api_error,
                 'last_update': time.time()
             }
 
@@ -110,9 +129,12 @@ class DeviceManager:
 
         except Exception as e:
             logger.error(f"Error getting status for {device_id}: {e}")
+            err_str = str(e).lower()
+            api_error = "Cloud API Quota Exceeded" if "quota" in err_str or "trial" in err_str or "28841004" in err_str or "'result'" in err_str else str(e)
             status = {
                 'online': False,
                 'is_on': False,
+                'api_error': api_error,
                 'error': str(e)
             }
 

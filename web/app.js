@@ -1,30 +1,65 @@
 // Deer Detection System - Frontend JavaScript
 
+// --- REMOTE LOGGING ---
+function remoteLog(level, message) {
+    console[level](message);
+    fetch('/api/client_log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level: level, message: message })
+    }).catch(e => console.error('Remote log failed:', e));
+}
+
+// Global error handler
+window.onerror = function(message, source, lineno, colno, error) {
+    remoteLog('error', `JS Error: ${message} at ${source}:${lineno}:${colno}`);
+    return false;
+};
+
+// Start logging early
+remoteLog('info', 'app.js script execution started (Remote Logging Active)');
+// -----------------------
+
+// --- HEARTBEAT TEST ---
+document.addEventListener('DOMContentLoaded', () => {
+    const statusEl = document.getElementById('system-status');
+    if (statusEl) {
+        statusEl.textContent = 'Script Loaded (Remote Active)...';
+        statusEl.style.backgroundColor = '#9C27B0'; // Purple for remote logging
+    }
+});
+// -----------------------
+
 // WebSocket connection
 let socket;
 let isConnected = false;
 
-// UI Elements
-const elements = {
-    systemStatus: document.getElementById('system-status'),
-    valveStatus: document.getElementById('valve-status'),
-    lastDetection: document.getElementById('last-detection'),
-    sessionDetections: document.getElementById('session-detections'),
-    cooldownStatus: document.getElementById('cooldown-status'),
-    eventLog: document.getElementById('event-log'),
-    connectionIndicator: document.getElementById('connection-indicator'),
-    connectionText: document.getElementById('connection-text'),
-    videoFeed: document.getElementById('video-feed'),
-    noFeedMessage: document.getElementById('no-feed-message'),
+// UI Elements (Initialized safely)
+let elements = {};
 
-    // Buttons
-    btnEnable: document.getElementById('btn-enable'),
-    btnDisable: document.getElementById('btn-disable'),
-    btnToggleCamera: document.getElementById('btn-toggle-camera'),
-    btnStopSprinkler: document.getElementById('btn-stop-sprinkler'),
-    btnTestSprinkler: document.getElementById('btn-test-sprinkler'),
-    btnTriggerMotion: document.getElementById('btn-trigger-motion')
-};
+function initElements() {
+    elements = {
+        systemStatus: document.getElementById('system-status'),
+        valveStatus: document.getElementById('valve-status'),
+        lastDetection: document.getElementById('last-detection'),
+        sessionDetections: document.getElementById('session-detections'),
+        cooldownStatus: document.getElementById('cooldown-status'),
+        eventLog: document.getElementById('event-log'),
+        connectionIndicator: document.getElementById('connection-indicator'),
+        connectionText: document.getElementById('connection-text'),
+        videoFeed: document.getElementById('video-feed'),
+        noFeedMessage: document.getElementById('no-feed-message'),
+
+        // Buttons
+        btnEnable: document.getElementById('btn-enable'),
+        btnDisable: document.getElementById('btn-disable'),
+        btnToggleCamera: document.getElementById('btn-toggle-camera'),
+        btnStopSprinkler: document.getElementById('btn-stop-sprinkler'),
+        btnTestSprinkler: document.getElementById('btn-test-sprinkler'),
+        btnTriggerMotion: document.getElementById('btn-trigger-motion')
+    };
+    console.log('[DEBUG] UI Elements initialized');
+}
 
 // Camera state
 let cameraActive = false;
@@ -66,21 +101,25 @@ function connectWebSocket() {
             addLogEntry('error', 'Connection timeout');
         });
 
-    socket.on('status', (data) => {
-        updateStatus(data);
-    });
+        socket.on('status', (data) => {
+            updateStatus(data);
+        });
 
-    socket.on('state', (data) => {
-        updateSystemState(data.state);
-    });
+        socket.on('state', (data) => {
+            updateSystemState(data.state);
+        });
 
-    socket.on('event', (data) => {
-        handleEvent(data);
-    });
+        socket.on('event', (data) => {
+            handleEvent(data);
+        });
 
-    socket.on('camera_status', (data) => {
-        handleCameraStatus(data);
-    });
+        socket.on('camera_status', (data) => {
+            handleCameraStatus(data);
+        });
+    } catch (error) {
+        console.error('[DEBUG] ❌ WebSocket initialization error:', error);
+        addLogEntry('error', 'WebSocket initialization error: ' + error.message);
+    }
 }
 
 // Update connection status indicator
@@ -104,12 +143,18 @@ function updateStatus(status) {
     updateSystemState(status.state);
 
     // Valve status
-    if (status.valve_on) {
+    if (status.valve_api_error) {
+        elements.valveStatus.textContent = 'API Error';
+        elements.valveStatus.className = 'status-badge disabled';
+        elements.valveStatus.title = status.valve_api_error;
+    } else if (status.valve_on) {
         elements.valveStatus.textContent = 'ON';
         elements.valveStatus.className = 'status-badge enabled';
+        elements.valveStatus.title = '';
     } else {
         elements.valveStatus.textContent = 'OFF';
         elements.valveStatus.className = 'status-badge disabled';
+        elements.valveStatus.title = '';
     }
 
     // Last detection
@@ -254,95 +299,111 @@ async function apiCall(endpoint, method = 'GET', data = null) {
 }
 
 // Button event handlers
-elements.btnEnable.addEventListener('click', async () => {
-    addLogEntry('system', 'Enabling system...');
-    const result = await apiCall('/system/enable', 'POST');
-    if (!result.success) {
-        addLogEntry('error', 'Failed to enable system');
+function setupEventListeners() {
+    if (!elements.btnEnable) {
+        console.error('btnEnable missing from elements');
+        return;
     }
-});
 
-elements.btnDisable.addEventListener('click', async () => {
-    addLogEntry('system', 'Disabling system...');
-    const result = await apiCall('/system/disable', 'POST');
-    if (!result.success) {
-        addLogEntry('error', 'Failed to disable system');
-    }
-});
+    elements.btnEnable.addEventListener('click', async () => {
+        addLogEntry('system', 'Enabling system...');
+        const result = await apiCall('/system/enable', 'POST');
+        if (!result.success) {
+            addLogEntry('error', 'Failed to enable system');
+        }
+    });
 
-elements.btnToggleCamera.addEventListener('click', async () => {
-    if (!cameraActive) {
-        // Activate camera
-        addLogEntry('camera', 'Activating live camera feed...');
-        const result = await apiCall('/trigger', 'POST');
+    elements.btnDisable.addEventListener('click', async () => {
+        addLogEntry('system', 'Disabling system...');
+        const result = await apiCall('/system/disable', 'POST');
+        if (!result.success) {
+            addLogEntry('error', 'Failed to disable system');
+        }
+    });
 
-        if (result.success !== false) {
-            cameraActive = true;
-            elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
-            elements.btnToggleCamera.classList.remove('btn-secondary');
-            elements.btnToggleCamera.classList.add('btn-warning');
-            elements.noFeedMessage.style.display = 'none';
+    elements.btnToggleCamera.addEventListener('click', async () => {
+        if (!cameraActive) {
+            // Activate camera
+            addLogEntry('camera', 'Activating live camera feed...');
+            const result = await apiCall('/trigger', 'POST');
 
-            // Keep camera alive by polling status
-            cameraKeepAliveInterval = setInterval(() => {
-                if (cameraActive) {
-                    pollStatus();
+            if (result.success !== false) {
+                cameraActive = true;
+                elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
+                elements.btnToggleCamera.classList.remove('btn-secondary');
+                elements.btnToggleCamera.classList.add('btn-warning');
+                elements.noFeedMessage.style.display = 'none';
+
+                // Keep camera alive by polling status
+                cameraKeepAliveInterval = setInterval(() => {
+                    if (cameraActive) {
+                        pollStatus();
+                    }
+                }, 3000);
+
+                addLogEntry('camera', 'Camera feed active');
+            }
+        } else {
+            // Deactivate camera
+            cameraActive = false;
+            elements.btnToggleCamera.textContent = '📹 View Live Camera';
+            elements.btnToggleCamera.classList.remove('btn-warning');
+            elements.btnToggleCamera.classList.add('btn-secondary');
+
+            if (cameraKeepAliveInterval) {
+                clearInterval(cameraKeepAliveInterval);
+                cameraKeepAliveInterval = null;
+            }
+
+            addLogEntry('camera', 'Camera feed stopped');
+        }
+    });
+
+    if (elements.btnStopSprinkler) {
+        elements.btnStopSprinkler.addEventListener('click', async () => {
+            if (confirm('Emergency stop sprinkler?')) {
+                addLogEntry('emergency', 'Emergency stop triggered');
+                const result = await apiCall('/sprinkler/off', 'POST');
+                if (!result.success) {
+                    addLogEntry('error', 'Failed to stop sprinkler');
                 }
-            }, 3000);
-
-            addLogEntry('camera', 'Camera feed active');
-        }
-    } else {
-        // Deactivate camera
-        cameraActive = false;
-        elements.btnToggleCamera.textContent = '📹 View Live Camera';
-        elements.btnToggleCamera.classList.remove('btn-warning');
-        elements.btnToggleCamera.classList.add('btn-secondary');
-
-        if (cameraKeepAliveInterval) {
-            clearInterval(cameraKeepAliveInterval);
-            cameraKeepAliveInterval = null;
-        }
-
-        addLogEntry('camera', 'Camera feed stopped');
+            }
+        });
     }
-});
 
-elements.btnStopSprinkler.addEventListener('click', async () => {
-    if (confirm('Emergency stop sprinkler?')) {
-        addLogEntry('emergency', 'Emergency stop triggered');
-        const result = await apiCall('/sprinkler/off', 'POST');
-        if (!result.success) {
-            addLogEntry('error', 'Failed to stop sprinkler');
-        }
+    if (elements.btnTestSprinkler) {
+        elements.btnTestSprinkler.addEventListener('click', async () => {
+            if (confirm('Test sprinkler for 10 seconds?')) {
+                addLogEntry('manual', 'Testing sprinkler (10s)');
+                const result = await apiCall('/sprinkler/on', 'POST', { duration: 10 });
+                if (!result.success) {
+                    addLogEntry('error', 'Failed to activate sprinkler');
+                }
+            }
+        });
     }
-});
 
-elements.btnTestSprinkler.addEventListener('click', async () => {
-    if (confirm('Test sprinkler for 10 seconds?')) {
-        addLogEntry('manual', 'Testing sprinkler (10s)');
-        const result = await apiCall('/sprinkler/on', 'POST', { duration: 10 });
-        if (!result.success) {
-            addLogEntry('error', 'Failed to activate sprinkler');
-        }
+    if (elements.btnTriggerMotion) {
+        elements.btnTriggerMotion.addEventListener('click', async () => {
+            addLogEntry('manual', 'Manual motion trigger');
+            const result = await apiCall('/trigger', 'POST');
+            if (!result.success) {
+                addLogEntry('warning', result.message || 'Trigger ignored');
+            }
+        });
     }
-});
-
-elements.btnTriggerMotion.addEventListener('click', async () => {
-    addLogEntry('manual', 'Manual motion trigger');
-    const result = await apiCall('/trigger', 'POST');
-    if (!result.success) {
-        addLogEntry('warning', result.message || 'Trigger ignored');
-    }
-});
+    
+    console.log('[DEBUG] Event listeners setup complete');
+}
 
 // Poll status periodically
 async function pollStatus() {
-    if (isConnected) {
-        const status = await apiCall('/status');
-        if (status && !status.error) {
-            updateStatus(status);
-        }
+    // We want to poll even if WebSocket is not connected (as a fallback)
+    const status = await apiCall('/status');
+    if (status && !status.error) {
+        // If we got status successfully, we can consider it "connected" for UI purposes
+        // although we don't want to set isConnected to true as that's for the socket
+        updateStatus(status);
     }
 }
 
@@ -428,37 +489,57 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[DEBUG] ========================================');
     console.log('[DEBUG] Deer Detection System UI initializing...');
     console.log('[DEBUG] ========================================');
+    
+    // Initialize elements first!
+    initElements();
+    
+    // Setup listeners!
+    setupEventListeners();
+    
     console.log('[DEBUG] Elements check:');
     console.log('[DEBUG] - eventLog:', elements.eventLog ? 'FOUND' : 'MISSING');
     console.log('[DEBUG] - systemStatus:', elements.systemStatus ? 'FOUND' : 'MISSING');
     console.log('[DEBUG] - connectionIndicator:', elements.connectionIndicator ? 'FOUND' : 'MISSING');
 
     // Load recent logs first
-    console.log('[DEBUG] Step 1: Loading recent logs...');
-    loadRecentLogs();
+    try {
+        console.log('[DEBUG] Step 1: Loading recent logs...');
+        loadRecentLogs();
+    } catch (e) { console.error('Step 1 failed:', e); }
 
-    console.log('[DEBUG] Step 2: Connecting WebSocket...');
-    connectWebSocket();
+    // Connect WebSocket
+    try {
+        console.log('[DEBUG] Step 2: Connecting WebSocket...');
+        if (typeof io !== 'undefined') {
+            connectWebSocket();
+        } else {
+            console.error('[DEBUG] ❌ Socket.IO library not found!');
+            addLogEntry('error', 'Socket.IO library failed to load');
+        }
+    } catch (e) { console.error('Step 2 failed:', e); }
 
-    console.log('[DEBUG] Step 3: Setting up video feed...');
-    checkVideoFeed();
+    // Set up video feed
+    try {
+        console.log('[DEBUG] Step 3: Setting up video feed...');
+        checkVideoFeed();
+    } catch (e) { console.error('Step 3 failed:', e); }
 
-    // Hide overlay since we're using direct stream URL
-    // Use multiple methods to ensure it's hidden
+    // Hide overlay
     if (elements.noFeedMessage) {
         elements.noFeedMessage.style.display = 'none';
         elements.noFeedMessage.style.visibility = 'hidden';
-        elements.noFeedMessage.style.opacity = '0';
-        elements.noFeedMessage.classList.add('hidden');
     }
 
-    console.log('[DEBUG] Step 4: Starting status polling...');
-    // Poll status every 5 seconds as backup
-    setInterval(pollStatus, 5000);
-
-    // Initial status poll
-    console.log('[DEBUG] Step 5: Initial status poll...');
-    pollStatus();
+    // Start status polling
+    try {
+        console.log('[DEBUG] Step 4: Starting status polling...');
+        // Poll status every 5 seconds as backup
+        setInterval(pollStatus, 5000);
+        
+        // Initial status poll
+        console.log('[DEBUG] Step 5: Initial status poll...');
+        pollStatus();
+    } catch (e) { console.error('Step 4/5 failed:', e); }
 
     console.log('[DEBUG] ========================================');
     console.log('[DEBUG] Initialization complete!');

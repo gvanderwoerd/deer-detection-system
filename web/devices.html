@@ -241,13 +241,19 @@
             fetch('/api/devices')
                 .then(res => res.json())
                 .then(data => {
-                    if (data.success) {
-                        devices = data.devices;
+                    if (data.api_error) {
+                        showError('Cloud API Error: ' + data.api_error);
+                    } else if (data.success) {
+                        document.getElementById('error').style.display = 'none';
+                    }
+                    
+                    if (data.success || data.devices) {
+                        devices = data.devices || [];
                         renderDevices();
                         document.getElementById('loading').style.display = 'none';
                         document.getElementById('lastUpdate').textContent = 
                             `Last updated: ${new Date().toLocaleTimeString()}`;
-                    } else {
+                    } else if (!data.api_error) {
                         showError('Failed to load devices: ' + data.error);
                     }
                 })
@@ -309,12 +315,20 @@
             fetch('/api/devices/refresh', { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.success) {
-                        devices = data.devices;
+                    if (data.api_error) {
+                        showError('Cloud API Error: ' + data.api_error);
+                    } else if (data.success) {
+                        document.getElementById('error').style.display = 'none';
+                    }
+
+                    if (data.success || data.devices) {
+                        devices = data.devices || [];
                         renderDevices();
                         document.getElementById('loading').style.display = 'none';
-                        alert(`✅ Refreshed! Found ${devices.length} devices`);
-                    } else {
+                        if (!data.api_error) {
+                            alert(`✅ Refreshed! Found ${devices.length} devices`);
+                        }
+                    } else if (!data.api_error) {
                         showError('Refresh failed: ' + data.error);
                     }
                 })
