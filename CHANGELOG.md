@@ -2,6 +2,12 @@
 
 ## 2026-03-14 - Cloud API Resilience & UI Robustness
 
+### Enhanced Animal Detection (NEW)
+- ✅ Expanded target classes to include animals often misidentified as deer by AI
+- ✅ Now targets: Cat, Dog, Horse, Sheep, Cow, Elephant, Bear, Zebra, Giraffe
+- ✅ Maintains strict **Person Detection Safety Check** (prevents activation if humans present)
+- ✅ Sensitivity remains high with 0.25 confidence threshold for partial captures
+
 ### Live Timestamp Overlay (NEW)
 - ✅ Implemented real-time date and time overlay on the camera feed
 - ✅ **12-hour clock format with AM/PM** for better readability

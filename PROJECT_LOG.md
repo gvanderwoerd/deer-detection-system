@@ -50,9 +50,10 @@ Automated animal detection system that activates SmartLife valves to deter deer,
 
 2. **AI Detection**
    - YOLOv8n detecting deer, cows, sheep in real-time
+   - **Expanded Classes**: Cat, Dog, Horse, Sheep, Cow, Elephant, Bear, Zebra, Giraffe (reduces missed detections)
    - Visual overlays with bounding boxes and confidence scores
    - Processes ~2 frames/second during active detection
-   - **Safety check: Never activates if person detected**
+   - **Safety check: Never activates if person (class 0) detected**
 
 3. **Detection Gallery & Storage** ✨ NEW (2026-03-09)
    - **Automatic Image Capture**: Saves JPEG of all detections
