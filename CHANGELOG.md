@@ -4,6 +4,7 @@
 
 ### Live Timestamp Overlay (NEW)
 - ✅ Implemented real-time date and time overlay on the camera feed
+- ✅ **12-hour clock format with AM/PM** for better readability
 - ✅ Timestamp is baked into the "clean" frame, ensuring it appears on the live dashboard
 - ✅ Automatic inclusion of the exact detection time in all images saved to the gallery
 - ✅ High-readability design with semi-transparent background box in the bottom-left corner
