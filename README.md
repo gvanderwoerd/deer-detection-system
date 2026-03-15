@@ -75,7 +75,7 @@ http://192.168.1.15:5000
 ### 1. Clone Repository
 ```bash
 cd /mnt/linux-data
-git clone <repository-url> deer-detection-system
+git clone https://github.com/gvanderwoerd/deer-detection-system.git
 cd deer-detection-system
 ```
 
@@ -245,7 +245,7 @@ The system includes a **mandatory person detection check**. If YOLOv8 detects a 
 
 ## License
 
-[Add your license here]
+MIT License - See LICENSE file for details
 
 ---
 
@@ -255,7 +255,7 @@ For issues or questions:
 1. Check `TROUBLESHOOTING_QUICK_REF.md`
 2. Review `esp32-cam/FIRMWARE_NOTES.md` (for camera issues)
 3. Check logs: `logs/server.log`
-4. Open GitHub issue
+4. Open issue: https://github.com/gvanderwoerd/deer-detection-system/issues
 
 ---
 
