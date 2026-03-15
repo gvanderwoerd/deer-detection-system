@@ -2,7 +2,71 @@
 
 **Date Started:** 2026-02-14
 **Status:** ✅ **FULLY OPERATIONAL** - Detection Gallery, 12hr Timestamp & Cloud Resilience Active
-**Last Updated:** 2026-03-14 16:15
+**Last Updated:** 2026-03-14 20:30
+
+---
+
+## 🚨 Critical Firmware Recovery (2026-03-14)
+
+### Issue
+Gemini AI assistant attempted to implement dual-core processing on ESP32-CAM, which broke the firmware. Camera showed black screen in browser.
+
+### Root Cause Analysis
+- **NOT a hardware failure** - ESP32-CAM and camera module tested individually and confirmed working
+- **Firmware corruption** - Gemini's dual-core modifications caused initialization failures
+- **Lost working firmware** - The stable firmware (with brownout mitigations) was never committed to git
+- Git only had the original firmware from Feb 16 12:18pm (which had brownout issues)
+
+### Recovery Process
+1. Tested hardware with minimal blink firmware → ✅ ESP32 working
+2. Tested camera initialization separately → ✅ Camera module working
+3. Located working firmware backup in `/mnt/linux-data/Arduino-Projects/esp32cam-test/`
+4. Restored working firmware → ✅ System operational
+
+### Working Firmware Characteristics (CRITICAL - DO NOT MODIFY)
+**Why this firmware structure is essential:**
+
+1. **3-Second Serial Stabilization Delay**
+   ```cpp
+   Serial.begin(115200);
+   delay(3000);  // CRITICAL - prevents brownout during init
+   ```
+   - Allows power supply to stabilize
+   - Prevents brownout detector from triggering false resets
+
+2. **Staggered Initialization Sequence**
+   - Step 1: LED initialization
+   - Step 2: Camera initialization (with PSRAM detection)
+   - Step 3: WiFi connection (after camera is stable)
+   - Step 4: Server startup
+   - **Each step has delays** - prevents simultaneous high current draw
+
+3. **LED Diagnostic Patterns**
+   - 3 quick blinks = Boot successful
+   - 5 quick blinks = Camera initialized
+   - 7 quick blinks = WiFi connected
+   - Slow blink = Running normally
+   - Fast continuous blink = Failed (check which step)
+
+4. **Static IP Configuration (192.168.1.100)**
+   - Predictable addressing when serial output unavailable
+   - Configured BEFORE WiFi.begin() to avoid DHCP delays
+
+5. **mDNS Support**
+   - Accessible via `http://esp32cam.local:81/`
+   - Fallback when IP address unknown
+
+### Lessons Learned
+- ❌ **NEVER** attempt dual-core processing on ESP32-CAM (brownout issues)
+- ✅ **ALWAYS** commit working firmware to git immediately
+- ✅ Keep initialization staggered with delays between major steps
+- ✅ The 3-second initial delay is CRITICAL for brownout prevention
+- ✅ Test hardware components separately when troubleshooting
+
+### Firmware Location (Definitive)
+**Primary:** `/mnt/linux-data/deer-detection-system/esp32-cam/src/main.cpp` (NOW IN GIT)
+**Backup:** `/mnt/linux-data/Arduino-Projects/esp32cam-test/src/main.cpp` (working copy)
+**Old/Obsolete:** `~/Desktop/OLD Pi Sprinker Server/` (different project, 2025)
 
 ---
 
@@ -12,11 +76,12 @@ Automated animal detection system that activates SmartLife valves to deter deer,
 
 ### System Components
 
-1. **ESP32-CAM** (192.168.1.16:81)
+1. **ESP32-CAM** (192.168.1.100:81 or esp32cam.local:81)
    - MJPEG streaming on port 81
-   - Deep sleep mode (5-minute active window)
-   - Wake on GPIO trigger from Yard Sentinel motion detector
+   - **Static IP:** 192.168.1.100 (consistent, no DHCP dependency)
+   - **mDNS hostname:** esp32cam.local
    - WiFi: CityWest_0090E24F
+   - LED diagnostics: 3-5-7 blink pattern on successful boot
 
 2. **Desktop PC Server** (192.168.1.15:5000)
    - Python Flask server with Socket.IO
