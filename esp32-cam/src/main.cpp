@@ -1,32 +1,58 @@
 /**
- * ESP32-CAM Deer Detection System Firmware
+ * ESP32-CAM Full Test with LED + Serial Error Reporting
  *
- * Features:
- * - Deep sleep mode for power saving
- * - GPIO wake on motion detection (Yard Sentinel trigger)
- * - MJPEG streaming server
- * - Auto-sleep after activity window
+ * LED Patterns:
+ * - 3 quick blinks = boot successful
+ * - 5 quick blinks = camera init successful
+ * - 7 quick blinks = WiFi connected
+ * - Slow blink = running normally
+ * - Fast blink continuous = failed (check serial for error)
+ *
+ * Serial Output: Detailed progress and error messages (NOT WORKING - hardware issue)
  */
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_camera.h>
-#include <esp_sleep.h>
+#include <ESPmDNS.h>  // For network discovery without needing IP address
 
-// ===== Configuration =====
+#define LED_PIN 33
+
+// ============================================================
+// WiFi Configuration
+// ============================================================
 const char* WIFI_SSID = "CityWest_0090E24F";
 const char* WIFI_PASSWORD = "cf72cc1722f549aa";
 
-// Motion trigger GPIO (connected to Yard Sentinel output)
-const int MOTION_TRIGGER_PIN = 13;  // GPIO 13
+// ============================================================
+// Network Identity Configuration (CUSTOMIZE FOR EACH DEVICE!)
+// ============================================================
+// IMPORTANT: Serial output doesn't work on ESP32-CAM hardware,
+// so we can't see the IP address. We solve this with:
+// 1. mDNS hostname - access via http://hostname.local:81/
+// 2. Static IP - predictable fallback address
+//
+// FOR MULTIPLE DEVICES:
+// - Change MDNS_HOSTNAME for each device (e.g., "esp32cam1", "esp32cam2")
+// - Change STATIC_IP last octet for each device (e.g., .100, .101, .102)
+// - Keep devices within your router's allowed static IP range
+//   (Usually outside DHCP range, e.g., .100-.200 if DHCP uses .2-.99)
+// ============================================================
 
-// Activity window (milliseconds) - how long to stay awake after trigger
-const unsigned long ACTIVE_WINDOW_MS = 5 * 60 * 1000;  // 5 minutes
+// mDNS Hostname - Device will be accessible at http://HOSTNAME.local:81/
+// CUSTOMIZE: Change "esp32cam" to unique name for each device
+const char* MDNS_HOSTNAME = "esp32cam";  // Device #1: "esp32cam", Device #2: "esp32cam2", etc.
 
-// LED pin for status indication
-const int LED_PIN = 33;  // Built-in LED on most ESP32-CAM boards
+// Static IP Configuration
+// CUSTOMIZE: Change last number (.100) for each device
+// Example: Device #1: .100, Device #2: .101, Device #3: .102
+IPAddress STATIC_IP(192, 168, 1, 100);   // This device's IP address
+IPAddress GATEWAY(192, 168, 1, 1);       // Router IP (usually .1)
+IPAddress SUBNET(255, 255, 255, 0);      // Standard home network subnet
+IPAddress DNS1(192, 168, 1, 1);          // Primary DNS (usually router)
+IPAddress DNS2(8, 8, 8, 8);              // Secondary DNS (Google DNS)
 
-// ===== Camera Configuration =====
+// Camera pins (AI-Thinker ESP32-CAM)
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1
 #define XCLK_GPIO_NUM      0
@@ -44,82 +70,63 @@ const int LED_PIN = 33;  // Built-in LED on most ESP32-CAM boards
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-// ===== Global Variables =====
-WiFiServer server(81);  // MJPEG streaming on port 81
-unsigned long wakeTime = 0;
-bool streamingActive = false;
+WiFiServer server(81);
 
-// ===== Function Declarations =====
-void setupCamera();
-void setupWiFi();
-void setupDeepSleep();
-void handleStream();
-void blinkLED(int times);
-
-// ===== Setup =====
-void setup() {
-  Serial.begin(115200);
-  Serial.println("\n\n=== ESP32-CAM Deer Detection System ===");
-
-  // Setup LED
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH);  // LED ON during startup
-
-  // Record wake time
-  wakeTime = millis();
-
-  // Print wake reason
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-  switch(wakeup_reason) {
-    case ESP_SLEEP_WAKEUP_EXT0:
-      Serial.println("Woke up by motion trigger!");
-      blinkLED(3);
-      break;
-    case ESP_SLEEP_WAKEUP_TIMER:
-      Serial.println("Woke up by timer");
-      break;
-    default:
-      Serial.println("Cold boot / reset");
-      break;
+void blinkPattern(int count, int onTime, int offTime) {
+  for(int i = 0; i < count; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(onTime);
+    digitalWrite(LED_PIN, LOW);
+    delay(offTime);
   }
-
-  // Initialize camera
-  setupCamera();
-
-  // Connect to WiFi
-  setupWiFi();
-
-  // Start streaming server
-  server.begin();
-  Serial.println("MJPEG server started on port 81");
-  Serial.print("Stream URL: http://");
-  Serial.print(WiFi.localIP());
-  Serial.println(":81/stream");
-
-  // Setup deep sleep
-  setupDeepSleep();
-
-  digitalWrite(LED_PIN, LOW);  // LED OFF - ready
 }
 
-// ===== Main Loop =====
-void loop() {
-  // Check if activity window expired
-  if (millis() - wakeTime > ACTIVE_WINDOW_MS) {
-    Serial.println("Activity window expired - entering deep sleep");
+void errorLoop(const char* errorMsg) {
+  Serial.println("========================================");
+  Serial.println("FATAL ERROR - HALTED");
+  Serial.println("========================================");
+  Serial.println(errorMsg);
+  Serial.println("========================================");
+  Serial.println("System halted. Reset to retry.");
+
+  // Fast blink forever
+  while(1) {
+    digitalWrite(LED_PIN, HIGH);
     delay(100);
-    esp_deep_sleep_start();
+    digitalWrite(LED_PIN, LOW);
+    delay(100);
   }
-
-  // Handle streaming
-  handleStream();
-
-  delay(1);  // Small delay to prevent watchdog
 }
 
-// ===== Camera Setup =====
-void setupCamera() {
-  Serial.println("Initializing camera...");
+void setup() {
+  // Initialize serial FIRST with long delay for stability
+  Serial.begin(115200);
+  delay(3000);  // Give serial time to stabilize
+
+  Serial.println();
+  Serial.println();
+  Serial.println("========================================");
+  Serial.println("ESP32-CAM BOOT SEQUENCE STARTING");
+  Serial.println("========================================");
+  Serial.println();
+
+  // Initialize LED
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH);
+  Serial.println("[STEP 1/4] LED initialization");
+  Serial.println("  Status: OK");
+
+  // Boot successful = 3 quick blinks
+  Serial.println("  LED Pattern: 3 quick blinks (boot OK)");
+  blinkPattern(3, 200, 200);
+  delay(500);
+
+  // ============================================================
+  // STEP 2: Camera Initialization
+  // ============================================================
+  Serial.println();
+  Serial.println("[STEP 2/4] Camera initialization");
+  Serial.println("  Configuring camera...");
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -143,162 +150,240 @@ void setupCamera() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
 
-  // Image quality settings
   if(psramFound()) {
-    Serial.println("PSRAM found - using high quality settings");
+    Serial.println("  PSRAM: FOUND");
     config.frame_size = FRAMESIZE_SVGA;  // 800x600
-    config.jpeg_quality = 10;  // 0-63, lower is higher quality
+    config.jpeg_quality = 10;
     config.fb_count = 2;
+    Serial.println("  Resolution: SVGA (800x600)");
+    Serial.println("  Quality: 10");
+    Serial.println("  Frame buffers: 2");
   } else {
-    Serial.println("PSRAM not found - using low quality settings");
+    Serial.println("  PSRAM: NOT FOUND");
     config.frame_size = FRAMESIZE_VGA;  // 640x480
     config.jpeg_quality = 12;
     config.fb_count = 1;
+    Serial.println("  Resolution: VGA (640x480)");
+    Serial.println("  Quality: 12");
+    Serial.println("  Frame buffers: 1");
   }
 
-  // Initialize camera
+  Serial.println("  Initializing camera driver...");
   esp_err_t err = esp_camera_init(&config);
+
   if (err != ESP_OK) {
-    Serial.printf("Camera init failed with error 0x%x\n", err);
-    // Blink LED rapidly to indicate error
-    for(int i = 0; i < 10; i++) {
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-      delay(100);
-    }
-    ESP.restart();
+    Serial.print("  Status: FAILED - Error code: 0x");
+    Serial.println(err, HEX);
+    Serial.println();
+    Serial.println("  Camera Error Codes:");
+    Serial.println("    0x105 (ESP_ERR_NOT_FOUND) - Camera not detected");
+    Serial.println("    0x106 (ESP_ERR_INVALID_STATE) - Camera busy/wrong state");
+    Serial.println("    0x101 (ESP_ERR_NO_MEM) - Out of memory");
+    Serial.println();
+    Serial.println("  Possible causes:");
+    Serial.println("    - Camera module not properly connected");
+    Serial.println("    - Ribbon cable dirty or damaged");
+    Serial.println("    - PSRAM issue");
+    Serial.println("    - Insufficient power supply");
+
+    errorLoop("CAMERA INITIALIZATION FAILED");
   }
 
-  Serial.println("Camera initialized successfully");
+  Serial.println("  Status: SUCCESS");
 
-  // Additional sensor settings
-  sensor_t * s = esp_camera_sensor_get();
-  if (s != NULL) {
-    // Flip image if needed
-    // s->set_vflip(s, 1);  // Vertical flip
-    // s->set_hmirror(s, 1);  // Horizontal mirror
-
-    // Auto settings
-    s->set_whitebal(s, 1);  // Auto white balance
-    s->set_awb_gain(s, 1);  // Auto white balance gain
-    s->set_exposure_ctrl(s, 1);  // Auto exposure
-    s->set_aec2(s, 1);  // Auto exposure 2
-    s->set_gain_ctrl(s, 1);  // Auto gain
-    s->set_agc_gain(s, 0);  // Auto gain value
-    s->set_bpc(s, 1);  // Black pixel correction
-    s->set_wpc(s, 1);  // White pixel correction
-    s->set_lenc(s, 1);  // Lens correction
+  // Test camera capture
+  Serial.println("  Testing camera capture...");
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("  Capture Status: FAILED");
+    errorLoop("CAMERA CAPTURE TEST FAILED");
   }
-}
 
-// ===== WiFi Setup =====
-void setupWiFi() {
-  Serial.print("Connecting to WiFi: ");
+  Serial.print("  Capture Status: SUCCESS - ");
+  Serial.print(fb->len);
+  Serial.println(" bytes");
+  Serial.print("  Image size: ");
+  Serial.print(fb->width);
+  Serial.print("x");
+  Serial.println(fb->height);
+  esp_camera_fb_return(fb);
+
+  // Camera success = 5 quick blinks
+  Serial.println("  LED Pattern: 5 quick blinks (camera OK)");
+  blinkPattern(5, 200, 200);
+  delay(500);
+
+  // ============================================================
+  // STEP 3: WiFi Connection
+  // ============================================================
+  Serial.println();
+  Serial.println("[STEP 3/4] WiFi connection");
+  Serial.print("  SSID: ");
   Serial.println(WIFI_SSID);
 
+  // Configure static IP BEFORE connecting
+  // This ensures we always get the same IP address
+  Serial.println("  Configuring static IP...");
+  Serial.print("    Static IP: ");
+  Serial.println(STATIC_IP);
+
   WiFi.mode(WIFI_STA);
+  WiFi.config(STATIC_IP, GATEWAY, SUBNET, DNS1, DNS2);
+
+  Serial.println("  Connecting...");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+  while (WiFi.status() != WL_CONNECTED && attempts < 40) {
     delay(500);
     Serial.print(".");
     attempts++;
+    if (attempts % 20 == 0) Serial.println();
+  }
+  Serial.println();
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("  Status: FAILED");
+    Serial.println();
+    Serial.println("  Possible causes:");
+    Serial.println("    - Incorrect SSID or password");
+    Serial.println("    - Router out of range");
+    Serial.println("    - WiFi antenna issue");
+    Serial.println("    - 2.4GHz WiFi disabled on router");
+
+    errorLoop("WIFI CONNECTION FAILED");
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected!");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("Signal strength: ");
-    Serial.print(WiFi.RSSI());
-    Serial.println(" dBm");
+  Serial.println("  Status: CONNECTED");
+  Serial.print("  IP Address: ");
+  Serial.println(WiFi.localIP());
+  Serial.print("  Signal Strength: ");
+  Serial.print(WiFi.RSSI());
+  Serial.println(" dBm");
+  Serial.print("  MAC Address: ");
+  Serial.println(WiFi.macAddress());
+
+  // Initialize mDNS for network discovery
+  // Allows access via http://hostname.local:81/ instead of IP
+  Serial.println("  Starting mDNS responder...");
+  if (MDNS.begin(MDNS_HOSTNAME)) {
+    Serial.print("    mDNS hostname: ");
+    Serial.print(MDNS_HOSTNAME);
+    Serial.println(".local");
+    Serial.print("    Access via: http://");
+    Serial.print(MDNS_HOSTNAME);
+    Serial.println(".local:81/");
   } else {
-    Serial.println("\nWiFi connection failed!");
-    Serial.println("Entering deep sleep...");
-    delay(1000);
-    esp_deep_sleep_start();
+    Serial.println("    mDNS FAILED (non-critical, use IP instead)");
   }
+
+  // WiFi success = 7 quick blinks
+  Serial.println("  LED Pattern: 7 quick blinks (WiFi OK)");
+  blinkPattern(7, 200, 200);
+  delay(500);
+
+  // ============================================================
+  // STEP 4: Start Streaming Server
+  // ============================================================
+  Serial.println();
+  Serial.println("[STEP 4/4] Starting streaming server");
+
+  server.begin();
+
+  Serial.println("  Status: RUNNING");
+  Serial.println();
+  Serial.println("========================================");
+  Serial.println("SYSTEM READY - ALL TESTS PASSED");
+  Serial.println("========================================");
+  Serial.println();
+  Serial.println("Stream Access (2 methods):");
+  Serial.println("  1. Via mDNS (recommended):");
+  Serial.print("     http://");
+  Serial.print(MDNS_HOSTNAME);
+  Serial.println(".local:81/");
+  Serial.println("  2. Via Static IP (fallback):");
+  Serial.print("     http://");
+  Serial.print(WiFi.localIP());
+  Serial.println(":81/");
+  Serial.println();
+  Serial.println("Waiting for connections...");
+  Serial.println("LED will blink slowly while running");
+  Serial.println();
+  Serial.println("NOTE: Serial output doesn't work on this hardware.");
+  Serial.println("      Use LED patterns for status monitoring.");
+
+  digitalWrite(LED_PIN, LOW);
 }
 
-// ===== Deep Sleep Setup =====
-void setupDeepSleep() {
-  Serial.println("Configuring deep sleep wake sources...");
-
-  // Wake on GPIO (motion trigger from Yard Sentinel)
-  // EXT0: Wake when pin goes HIGH
-  esp_sleep_enable_ext0_wakeup((gpio_num_t)MOTION_TRIGGER_PIN, 1);
-
-  Serial.print("Will wake on GPIO ");
-  Serial.print(MOTION_TRIGGER_PIN);
-  Serial.println(" going HIGH");
-}
-
-// ===== Stream Handler =====
-void handleStream() {
+void loop() {
+  // Handle streaming clients
   WiFiClient client = server.available();
 
-  if (!client) {
-    return;
-  }
+  if (client) {
+    Serial.println(">>> Client connected for streaming");
+    digitalWrite(LED_PIN, HIGH);
 
-  Serial.println("Client connected for streaming");
-  streamingActive = true;
-  digitalWrite(LED_PIN, HIGH);  // LED ON during streaming
+    // Read HTTP request
+    String req = "";
+    while (client.connected() && !client.available()) delay(1);
+    while (client.available()) req += (char)client.read();
 
-  // Wait for HTTP request
-  String req = "";
-  while (client.connected() && !client.available()) {
-    delay(1);
-  }
+    Serial.println("Sending MJPEG stream...");
 
-  while (client.available()) {
-    req += (char)client.read();
-  }
+    // Send MJPEG headers
+    client.println("HTTP/1.1 200 OK");
+    client.println("Content-Type: multipart/x-mixed-replace; boundary=frame");
+    client.println("Access-Control-Allow-Origin: *");
+    client.println();
 
-  Serial.println("Request received");
+    // Stream frames
+    int frameCount = 0;
+    while (client.connected()) {
+      camera_fb_t *fb = esp_camera_fb_get();
 
-  // Send HTTP headers for MJPEG stream
-  client.println("HTTP/1.1 200 OK");
-  client.println("Content-Type: multipart/x-mixed-replace; boundary=frame");
-  client.println("Access-Control-Allow-Origin: *");
-  client.println();
+      if (!fb) {
+        Serial.println("ERROR: Camera capture failed during stream");
+        break;
+      }
 
-  // Stream frames
-  while (client.connected()) {
-    camera_fb_t *fb = esp_camera_fb_get();
+      // Send frame
+      client.println("--frame");
+      client.println("Content-Type: image/jpeg");
+      client.print("Content-Length: ");
+      client.println(fb->len);
+      client.println();
+      client.write(fb->buf, fb->len);
+      client.println();
 
-    if (!fb) {
-      Serial.println("Camera capture failed");
-      break;
+      esp_camera_fb_return(fb);
+
+      frameCount++;
+      if (frameCount % 30 == 0) {
+        Serial.print("Streaming... frame ");
+        Serial.println(frameCount);
+      }
+
+      delay(33);  // ~30 FPS
     }
 
-    // Send frame
-    client.println("--frame");
-    client.println("Content-Type: image/jpeg");
-    client.print("Content-Length: ");
-    client.println(fb->len);
-    client.println();
-    client.write(fb->buf, fb->len);
-    client.println();
-
-    esp_camera_fb_return(fb);
-
-    // Small delay between frames
-    delay(33);  // ~30 FPS
+    client.stop();
+    digitalWrite(LED_PIN, LOW);
+    Serial.print("<<< Client disconnected - streamed ");
+    Serial.print(frameCount);
+    Serial.println(" frames");
+    Serial.println();
   }
 
-  client.stop();
-  streamingActive = false;
-  digitalWrite(LED_PIN, LOW);  // LED OFF
-  Serial.println("Client disconnected");
-}
+  // Slow blink when idle
+  static unsigned long lastBlink = 0;
+  static bool ledState = false;
+  if (millis() - lastBlink > 1000) {
+    ledState = !ledState;
+    digitalWrite(LED_PIN, ledState);
+    lastBlink = millis();
 
-// ===== Utility Functions =====
-void blinkLED(int times) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
-    digitalWrite(LED_PIN, LOW);
-    delay(200);
+    if (ledState) {
+      Serial.print(".");  // Heartbeat
+    }
   }
 }
