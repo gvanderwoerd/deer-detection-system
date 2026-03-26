@@ -114,6 +114,7 @@ class DeerDetectionSystem:
         # System state
         self.state = SystemState.IDLE
         self.enabled = True
+        self.motion_active = False  # Real-time PIR sensor state
 
         # Session tracking
         self.session_start = None
@@ -135,7 +136,7 @@ class DeerDetectionSystem:
         self.last_frame_time = None  # Track when frames are received
         self.auto_detection_active = False  # Track if auto-detection is running
 
-        # Start continuous frame capture
+        # Start continuous frame capture (includes PIR status from stream headers)
         self._start_frame_capture()
 
         logger.info("System initialized successfully")
@@ -147,6 +148,12 @@ class DeerDetectionSystem:
             connection_attempts = 0
             while True:
                 try:
+                    # Only skip connection if system is DISABLED (not IDLE)
+                    # IDLE means waiting for motion, but camera can still be viewed
+                    if self.state == SystemState.DISABLED:
+                        time.sleep(1)
+                        continue
+
                     connection_attempts += 1
                     # Only log every 10th connection attempt (reduce noise)
                     if connection_attempts == 1 or connection_attempts % 10 == 0:
@@ -158,6 +165,24 @@ class DeerDetectionSystem:
 
                     for chunk in stream.iter_content(chunk_size=1024):
                         bytes_buffer += chunk
+
+                        # Parse PIR status from multipart headers (before JPEG data)
+                        pir_header_marker = b'X-PIR-Status: '
+                        pir_pos = bytes_buffer.find(pir_header_marker)
+                        if pir_pos != -1:
+                            # Extract PIR status value (everything until \r\n)
+                            status_start = pir_pos + len(pir_header_marker)
+                            status_end = bytes_buffer.find(b'\r\n', status_start)
+                            if status_end != -1:
+                                pir_status = bytes_buffer[status_start:status_end].decode('utf-8').strip()
+                                is_active = (pir_status == 'active')
+
+                                # Update PIR status if changed
+                                if self.motion_active != is_active:
+                                    self.motion_active = is_active
+                                    socketio.emit('motion_status', {'active': is_active})
+                                    logger.info(f"PIR: {'MOTION DETECTED' if is_active else 'no motion'}")
+
                         # Find JPEG boundaries
                         a = bytes_buffer.find(b'\xff\xd8')  # JPEG start
                         b = bytes_buffer.find(b'\xff\xd9')  # JPEG end
@@ -217,6 +242,32 @@ class DeerDetectionSystem:
 
         thread = threading.Thread(target=capture_worker, daemon=True)
         thread.start()
+
+    def _start_pir_polling(self):
+        """Poll ESP32 for PIR sensor status every 2 seconds"""
+        def pir_poller():
+            logger.info("Starting PIR sensor polling thread")
+            while True:
+                try:
+                    # Poll ESP32 PIR server on port 82 (separate from camera stream on port 81)
+                    pir_url = ESP32_CAM_STREAM_URL.replace(':81', ':82').rstrip('/')
+                    response = requests.get(pir_url, timeout=2)
+                    if response.status_code == 200:
+                        data = response.json()
+                        is_active = data.get('active', False)
+
+                        # Update state and broadcast
+                        if self.motion_active != is_active:
+                            self.motion_active = is_active
+                            socketio.emit('motion_status', {'active': is_active})
+                            logger.info(f"PIR: {'MOTION DETECTED' if is_active else 'no motion'}")
+                except Exception as e:
+                    logger.warning(f"PIR poll failed: {e}")  # Temporary debug logging
+
+                time.sleep(2)  # Poll every 2 seconds
+
+        pir_thread = threading.Thread(target=pir_poller, daemon=True)
+        pir_thread.start()
 
     def _draw_timestamp(self, frame):
         """Draw date/time overlay on the frame (bottom-left)"""
@@ -442,6 +493,7 @@ class DeerDetectionSystem:
         return {
             'state': self.state.value,
             'enabled': self.enabled,
+            'motion_active': self.motion_active,
             'valve_on': valve_status.get('is_on', False),
             'valve_configured': valve_status.get('configured', False),
             'valve_api_error': valve_status.get('api_error'),
@@ -495,6 +547,40 @@ def devices_page():
 def api_status():
     """Get system status"""
     return jsonify(system.get_status())
+
+
+@app.route('/api/motion', methods=['POST'])
+def api_motion():
+    """Real-time motion status from ESP32-CAM"""
+    try:
+        data = request.json
+        is_active = data.get('active', False)
+        
+        # Update system state
+        system.motion_active = is_active
+        
+        # Broadcast to all clients
+        socketio.emit('motion_status', {'active': is_active})
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+
+@app.route('/api/debug', methods=['POST'])
+def api_debug():
+    """Debug endpoint to receive GPIO state from ESP32"""
+    try:
+        data = request.json
+        gpio = data.get('gpio')
+        state = data.get('state')
+        high = data.get('high')
+        logger.info(f"ESP32 DEBUG: GPIO {gpio} = {state} (interpreted as: {'HIGH' if high else 'LOW'})")
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Debug endpoint error: {e}")
+        return jsonify({'success': False}), 500
 
 
 @app.route('/api/trigger', methods=['POST'])

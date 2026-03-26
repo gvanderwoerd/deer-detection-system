@@ -49,6 +49,7 @@ function initElements() {
         connectionText: document.getElementById('connection-text'),
         videoFeed: document.getElementById('video-feed'),
         noFeedMessage: document.getElementById('no-feed-message'),
+        pirStatus: document.getElementById('pir-status'),
 
         // Buttons
         btnEnable: document.getElementById('btn-enable'),
@@ -117,6 +118,10 @@ function connectWebSocket() {
         socket.on('camera_status', (data) => {
             handleCameraStatus(data);
         });
+
+        socket.on('motion_status', (data) => {
+            handleMotionStatus(data);
+        });
     } catch (error) {
         console.error('[DEBUG] ❌ WebSocket initialization error:', error);
         addLogEntry('error', 'WebSocket initialization error: ' + error.message);
@@ -180,6 +185,22 @@ function updateStatus(status) {
 
     // Update button states
     updateButtonStates(status);
+
+    // Initial motion status
+    handleMotionStatus({ active: status.motion_active });
+}
+
+// Handle motion status updates
+function handleMotionStatus(data) {
+    if (!elements.pirStatus) return;
+
+    if (data.active) {
+        elements.pirStatus.textContent = 'MOTION DETECTED';
+        elements.pirStatus.className = 'status-badge enabled';
+    } else {
+        elements.pirStatus.textContent = 'NO MOTION';
+        elements.pirStatus.className = 'status-badge disabled';
+    }
 }
 
 // Update system state

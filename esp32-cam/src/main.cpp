@@ -17,6 +17,7 @@
 #include <ESPmDNS.h>  // For network discovery without needing IP address
 
 #define LED_PIN 33
+#define PIR_PIN 14  // PIR motion sensor on GPIO 14
 
 // ============================================================
 // WiFi Configuration
@@ -70,7 +71,8 @@ IPAddress DNS2(8, 8, 8, 8);              // Secondary DNS (Google DNS)
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-WiFiServer server(81);
+WiFiServer server(81);  // Main camera stream server
+WiFiServer pirServer(82);  // PIR status server on separate port
 
 void blinkPattern(int count, int onTime, int offTime) {
   for(int i = 0; i < count; i++) {
@@ -113,6 +115,7 @@ void setup() {
   // Initialize LED
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
+  pinMode(PIR_PIN, INPUT);  // PIR sensor input
   Serial.println("[STEP 1/4] LED initialization");
   Serial.println("  Status: OK");
 
@@ -286,11 +289,13 @@ void setup() {
   // STEP 4: Start Streaming Server
   // ============================================================
   Serial.println();
-  Serial.println("[STEP 4/4] Starting streaming server");
+  Serial.println("[STEP 4/4] Starting servers");
 
   server.begin();
+  pirServer.begin();
 
-  Serial.println("  Status: RUNNING");
+  Serial.println("  Camera stream server: RUNNING (port 81)");
+  Serial.println("  PIR status server: RUNNING (port 82)");
   Serial.println();
   Serial.println("========================================");
   Serial.println("SYSTEM READY - ALL TESTS PASSED");
@@ -316,7 +321,28 @@ void setup() {
 }
 
 void loop() {
-  // Handle streaming clients
+  // Handle PIR status requests (port 82) - checked first so it's always responsive
+  WiFiClient pirClient = pirServer.available();
+  if (pirClient) {
+    // Read HTTP request
+    String req = "";
+    while (pirClient.connected() && !pirClient.available()) delay(1);
+    while (pirClient.available()) req += (char)pirClient.read();
+
+    // Return PIR sensor status as JSON
+    bool pirState = digitalRead(PIR_PIN) == HIGH;
+    pirClient.println("HTTP/1.1 200 OK");
+    pirClient.println("Content-Type: application/json");
+    pirClient.println("Access-Control-Allow-Origin: *");
+    pirClient.println();
+    pirClient.print("{\"active\":");
+    pirClient.print(pirState ? "true" : "false");
+    pirClient.println("}");
+    pirClient.stop();
+    return;  // Return immediately to keep loop responsive
+  }
+
+  // Handle streaming clients (port 81)
   WiFiClient client = server.available();
 
   if (client) {
@@ -346,11 +372,14 @@ void loop() {
         break;
       }
 
-      // Send frame
+      // Send frame with PIR status in headers
       client.println("--frame");
       client.println("Content-Type: image/jpeg");
       client.print("Content-Length: ");
       client.println(fb->len);
+      // Include PIR sensor status in custom header
+      client.print("X-PIR-Status: ");
+      client.println(digitalRead(PIR_PIN) == HIGH ? "active" : "inactive");
       client.println();
       client.write(fb->buf, fb->len);
       client.println();

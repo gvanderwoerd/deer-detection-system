@@ -51,6 +51,19 @@ Automated animal detection system that activates SmartLife valves to deter anima
 
 ## Recent Updates
 
+### 2026-03-25: PIR Motion Sensor Integration (Final Working Version)
+- **Feature:** Added HC-SR501 PIR sensor on GPIO 14
+- **Implementation:** PIR status embedded in MJPEG stream headers (`X-PIR-Status: active/inactive`)
+- **Architecture:** Server parses PIR status from video stream - no separate connection needed
+- **Advantages:**
+  - Works within ESP32's single-connection limitation
+  - Real-time updates with every frame (~30 FPS)
+  - No additional network overhead
+  - Always available when camera is streaming
+- **Bug Fixes:** Removed non-functional "Tuning Mode" feature from Gemini's implementation
+- **Status:** ✅ Fully operational - PIR sensor provides continuous real-time motion feedback
+
+
 ### 2026-03-14: Firmware Recovery
 - **Issue:** Gemini AI broke firmware attempting dual-core processing
 - **Fix:** Restored working firmware from backup (`Arduino-Projects/esp32cam-test/`)

@@ -82,6 +82,18 @@ MDNS.begin("esp32cam");
 
 ---
 
+### 6. PIR Motion Sensor Integration (HC-SR501)
+- **Pin:** GPIO 14
+- **Implementation:** PIR status embedded in MJPEG stream headers
+- **Header:** `X-PIR-Status: active` or `X-PIR-Status: inactive`
+- **Behavior:** Server reads PIR status from video stream without separate connection
+- **Advantage:** No additional network overhead, works within ESP32's single-connection limitation
+- **Real-time:** Status updates with every video frame (~30 FPS)
+
+**Note:** Port 82 server exists as backup but is not actively used (PIR via stream headers is preferred)
+
+---
+
 ## What NOT to Do
 
 ### ❌ NEVER:
@@ -91,6 +103,7 @@ MDNS.begin("esp32cam");
 4. **Add complex processing during init** - Keep init simple and fast
 5. **Use DHCP without static IP fallback** - Delays can cause brownout
 6. **Remove LED diagnostic patterns** - You'll be blind when troubleshooting
+7. **Use GPIO 14 for other purposes** - Now reserved for PIR sensor
 
 ### ❌ FAILED EXPERIMENTS:
 - **Gemini's dual-core firmware (2026-03-14)** - Caused complete system failure
