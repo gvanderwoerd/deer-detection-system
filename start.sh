@@ -31,6 +31,7 @@ if lsof -Pi :5000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
     else
         echo -e "${GREEN}Opening dashboard in existing server...${NC}"
         xdg-open http://192.168.1.15:5000 &
+        sleep 2  # Give browser time to open
         exit 0
     fi
 fi
@@ -102,3 +103,5 @@ echo ""
 echo -e "Server will keep running even if you close this terminal."
 echo -e "To stop the server: ${YELLOW}./stop.sh${NC}"
 echo ""
+echo -e "${YELLOW}Press any key to close this window...${NC}"
+read -n 1 -s
