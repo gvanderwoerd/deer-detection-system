@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from collections import deque
 from device_manager import get_device_manager
-from flask import Flask, render_template, Response, jsonify, request
+from flask import Flask, Response, jsonify, request
 from flask_socketio import SocketIO, emit
 import requests
 import cv2
@@ -245,32 +245,6 @@ class DeerDetectionSystem:
 
         thread = threading.Thread(target=capture_worker, daemon=True)
         thread.start()
-
-    def _start_pir_polling(self):
-        """Poll ESP32 for PIR sensor status every 2 seconds"""
-        def pir_poller():
-            logger.info("Starting PIR sensor polling thread")
-            while True:
-                try:
-                    # Poll ESP32 PIR server on port 82 (separate from camera stream on port 81)
-                    pir_url = ESP32_CAM_STREAM_URL.replace(':81', ':82').rstrip('/')
-                    response = requests.get(pir_url, timeout=2)
-                    if response.status_code == 200:
-                        data = response.json()
-                        is_active = data.get('active', False)
-
-                        # Update state and broadcast
-                        if self.motion_active != is_active:
-                            self.motion_active = is_active
-                            socketio.emit('motion_status', {'active': is_active})
-                            logger.info(f"PIR: {'MOTION DETECTED' if is_active else 'no motion'}")
-                except Exception as e:
-                    logger.warning(f"PIR poll failed: {e}")  # Temporary debug logging
-
-                time.sleep(2)  # Poll every 2 seconds
-
-        pir_thread = threading.Thread(target=pir_poller, daemon=True)
-        pir_thread.start()
 
     def _draw_timestamp(self, frame):
         """Draw date/time overlay on the frame (bottom-left)"""

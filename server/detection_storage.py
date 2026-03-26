@@ -4,7 +4,6 @@ Handles saving, loading, and managing detection images and metadata
 """
 
 import json
-import os
 import cv2
 from datetime import datetime, timedelta
 from pathlib import Path

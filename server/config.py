@@ -1,4 +1,16 @@
 # Deer Detection System Configuration
+import os
+from pathlib import Path
+
+# Load environment variables from .env file if it exists
+env_file = Path(__file__).parent.parent / '.env'
+if env_file.exists():
+    with open(env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key, value = line.split('=', 1)
+                os.environ.setdefault(key.strip(), value.strip())
 
 # === Network Configuration ===
 SERVER_HOST = '0.0.0.0'  # Listen on all interfaces
@@ -20,15 +32,16 @@ COOLDOWN_PERIOD_SECONDS = 120  # Wait 2 minutes between activations
 MAX_DETECTIONS_PER_SESSION = 3  # Max times to activate sprinkler in one session
 
 # === Tuya Cloud API Configuration ===
-TUYA_CLOUD_API_KEY = "rqwuq7sgvv57f745g5m8"
-TUYA_CLOUD_API_SECRET = "e75337eab5e74a56844e7d2891aaa676"
-TUYA_CLOUD_REGION = "us"
+# Load from environment variables for security
+# Create a .env file based on .env.example with your credentials
+TUYA_CLOUD_API_KEY = os.getenv('TUYA_API_KEY', '')
+TUYA_CLOUD_API_SECRET = os.getenv('TUYA_API_SECRET', '')
+TUYA_CLOUD_REGION = os.getenv('TUYA_CLOUD_REGION', 'us')
 
 # Primary valve for deer detection system
-PRIMARY_VALVE_ID = 'eb2f5498a4e53362f5lumi'  # Back flowers valve
+PRIMARY_VALVE_ID = os.getenv('PRIMARY_VALVE_ID', '')
 
 # === Logging ===
-LOG_DETECTIONS = True
 LOG_FILE = 'deer_detection.log'
 MAX_LOG_ENTRIES = 1000  # Keep last 1000 events in memory
 

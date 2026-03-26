@@ -45,7 +45,8 @@ server/detections/*.png
 # Model files (too large for git)
 *.pt
 
-# Tuya credentials (contains API keys)
+# Environment variables and credentials
+.env
 server/tinytuya.json
 
 # OS

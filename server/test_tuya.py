@@ -1,7 +1,6 @@
 
 import tinytuya
 import logging
-import sys
 from config import TUYA_CLOUD_API_KEY, TUYA_CLOUD_API_SECRET, TUYA_CLOUD_REGION
 
 # Setup logging
