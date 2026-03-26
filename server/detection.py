@@ -79,7 +79,8 @@ class DeerDetector:
                         detections.append({
                             'bbox': (int(x1), int(y1), int(x2), int(y2)),
                             'confidence': confidence,
-                            'class': class_name
+                            'class': class_name,
+                            'class_id': class_id
                         })
 
                         logger.info(f"🎯 TARGET ANIMAL ({class_name.upper()}) detected with confidence: {confidence:.2f}")

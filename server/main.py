@@ -28,6 +28,7 @@ from config import (
     SPRINKLER_DURATION_SECONDS,
     COOLDOWN_PERIOD_SECONDS,
     MAX_DETECTIONS_PER_SESSION,
+    SAVE_CLASS_IDS,
     LOG_FILE,
     MAX_LOG_ENTRIES
 )
@@ -385,11 +386,15 @@ class DeerDetectionSystem:
     def _handle_deer_detection(self, detections, annotated_frame):
         """Handle target animal detection (deer, cow, sheep)"""
         animal_type = detections[0]['class']
+        class_id = detections[0].get('class_id')
 
-        # ALWAYS save detection image (even if we don't activate)
-        storage = get_detection_storage()
-        saved_filename = storage.save_detection(annotated_frame, detections, animal_type)
-        logger.info(f"📸 Detection image saved: {saved_filename}")
+        # Only save deer, cow, sheep detections to gallery (not cats, dogs, etc.)
+        if class_id in SAVE_CLASS_IDS:
+            storage = get_detection_storage()
+            saved_filename = storage.save_detection(annotated_frame, detections, animal_type)
+            logger.info(f"📸 Detection image saved: {saved_filename} ({animal_type})")
+        else:
+            logger.info(f"ℹ️ Detection not saved: {animal_type} (class {class_id}) - not in save list")
 
         # Check if we've hit the max detections for this session
         if self.session_detections >= MAX_DETECTIONS_PER_SESSION:

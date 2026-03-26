@@ -19,9 +19,15 @@ ESP32_CAM_STREAM_URL = 'http://esp32cam.local:81/'  # ESP32-CAM via mDNS (hostna
 
 # === Detection Configuration ===
 DETECTION_CONFIDENCE = 0.25  # Confidence threshold (0.0-1.0) - lowered for testing
-# COCO class IDs that could be misidentified as deer/cow/sheep
+
+# COCO class IDs for target detection (trigger sprinkler)
 # 15: cat, 16: dog, 17: horse, 18: sheep, 19: cow, 20: elephant, 21: bear, 22: zebra, 23: giraffe
-TARGET_CLASS_IDS = [15, 16, 17, 18, 19, 20, 21, 22, 23]  
+TARGET_CLASS_IDS = [15, 16, 17, 18, 19, 20, 21, 22, 23]
+
+# COCO class IDs to SAVE to detection gallery (only deer/cow/sheep)
+# Note: COCO doesn't have "deer" - using horse(17) and bear(21) as proxies
+SAVE_CLASS_IDS = [17, 18, 19, 21]  # horse(deer proxy), sheep, cow, bear(deer proxy)
+
 PERSON_CLASS_ID = 0  # COCO: person=0 (safety check - never activate with people)
 MODEL_PATH = 'yolov8n.pt'  # YOLOv8 nano model
 
