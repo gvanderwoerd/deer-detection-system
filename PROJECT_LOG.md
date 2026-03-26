@@ -51,7 +51,14 @@ Automated animal detection system that activates SmartLife valves to deter anima
 
 ## Recent Updates
 
-### 2026-03-25: PIR Motion Sensor Integration (Final Working Version)
+### 2026-03-25: Last Detection Timestamp Enhancement (Commit ac736db)
+- **Feature:** "Last Detection" dashboard field now shows last PIR motion detection
+- **Display Format:** "March 25 2026 7:37:43 PM" (full date + 12-hour time)
+- **Behavior:** Updates in real-time when PIR detects motion, persists until next detection
+- **Implementation:** Timestamp tracked when motion_active changes from false to true
+- **Status:** ✅ Provides clear visual feedback of most recent motion event
+
+### 2026-03-25: PIR Motion Sensor Integration (Commit cbc440b)
 - **Feature:** Added HC-SR501 PIR sensor on GPIO 14
 - **Implementation:** PIR status embedded in MJPEG stream headers (`X-PIR-Status: active/inactive`)
 - **Architecture:** Server parses PIR status from video stream - no separate connection needed
@@ -62,7 +69,6 @@ Automated animal detection system that activates SmartLife valves to deter anima
   - Always available when camera is streaming
 - **Bug Fixes:** Removed non-functional "Tuning Mode" feature from Gemini's implementation
 - **Status:** ✅ Fully operational - PIR sensor provides continuous real-time motion feedback
-
 
 ### 2026-03-14: Firmware Recovery
 - **Issue:** Gemini AI broke firmware attempting dual-core processing
