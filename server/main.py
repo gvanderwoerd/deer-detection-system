@@ -485,6 +485,15 @@ class DeerDetectionSystem:
 # Initialize system
 system = DeerDetectionSystem()
 
+# Clean up old detection images (keep last 7 days)
+try:
+    storage = get_detection_storage()
+    files_deleted, space_freed = storage.cleanup_old_detections(max_age_days=7)
+    if files_deleted > 0:
+        logger.info(f"Startup cleanup: Removed {files_deleted} old detection files ({space_freed:.2f} MB)")
+except Exception as e:
+    logger.warning(f"Startup cleanup failed: {e}")
+
 
 # ===== Flask Routes =====
 
@@ -524,28 +533,6 @@ def devices_page():
 def api_status():
     """Get system status"""
     return jsonify(system.get_status())
-
-
-@app.route('/api/motion', methods=['POST'])
-def api_motion():
-    """Real-time motion status from ESP32-CAM"""
-    try:
-        data = request.json
-        is_active = data.get('active', False)
-
-        # Update system state
-        system.motion_active = is_active
-        # Track last motion detection time
-        if is_active:
-            system.last_detection_time = datetime.now()
-
-        # Broadcast to all clients
-        socketio.emit('motion_status', {'active': is_active})
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 400
-
 
 
 @app.route('/api/debug', methods=['POST'])

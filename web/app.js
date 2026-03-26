@@ -589,13 +589,24 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.noFeedMessage.style.visibility = 'hidden';
     }
 
-    // Start status polling
+    // Start fallback polling (only when WebSocket disconnected)
     try {
-        console.log('[DEBUG] Step 4: Starting status polling...');
-        // Poll status every 5 seconds as backup
-        setInterval(pollStatus, 5000);
-        
-        // Initial status poll
+        console.log('[DEBUG] Step 4: Setting up fallback polling...');
+        let isSocketConnected = false;
+
+        // Track WebSocket connection status
+        socket.on('connect', () => { isSocketConnected = true; });
+        socket.on('disconnect', () => { isSocketConnected = false; });
+
+        // Poll only when WebSocket is disconnected (fallback mode)
+        setInterval(() => {
+            if (!isSocketConnected) {
+                console.log('[FALLBACK] WebSocket disconnected, using HTTP polling');
+                pollStatus();
+            }
+        }, 5000);
+
+        // Initial status poll (WebSocket may not be connected yet)
         console.log('[DEBUG] Step 5: Initial status poll...');
         pollStatus();
     } catch (e) { console.error('Step 4/5 failed:', e); }

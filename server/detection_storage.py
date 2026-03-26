@@ -220,6 +220,47 @@ class DetectionStorage:
         """Get full path to detection image"""
         return DETECTIONS_DIR / filename
 
+    def cleanup_old_detections(self, max_age_days=7):
+        """
+        Remove detection images and metadata older than max_age_days
+
+        Args:
+            max_age_days: Maximum age in days to keep (default: 7)
+
+        Returns:
+            tuple: (files_deleted: int, space_freed_mb: float)
+        """
+        try:
+            cutoff = datetime.now() - timedelta(days=max_age_days)
+            files_deleted = 0
+            space_freed = 0
+
+            # Clean up image files
+            for img_file in DETECTIONS_DIR.glob("*.jpg"):
+                file_time = datetime.fromtimestamp(img_file.stat().st_mtime)
+                if file_time < cutoff:
+                    space_freed += img_file.stat().st_size
+                    img_file.unlink()
+                    files_deleted += 1
+
+            # Clean up metadata entries
+            original_count = len(self.metadata)
+            self.metadata = [
+                entry for entry in self.metadata
+                if datetime.fromisoformat(entry['timestamp']) >= cutoff
+            ]
+
+            if len(self.metadata) < original_count:
+                self._save_metadata()
+
+            space_freed_mb = space_freed / (1024 * 1024)
+            logger.info(f"Cleanup: Deleted {files_deleted} files older than {max_age_days} days ({space_freed_mb:.2f} MB freed)")
+            return files_deleted, space_freed_mb
+
+        except Exception as e:
+            logger.error(f"Cleanup failed: {e}")
+            return 0, 0.0
+
 
 # Singleton instance
 _storage_instance = None
