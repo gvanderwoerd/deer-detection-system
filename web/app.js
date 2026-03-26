@@ -166,7 +166,18 @@ function updateStatus(status) {
     // Last detection
     if (status.last_detection) {
         const date = new Date(status.last_detection);
-        elements.lastDetection.textContent = date.toLocaleTimeString();
+        // Format: March 25 2026 7:37:43 PM
+        const options = {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        };
+        const formatted = date.toLocaleString('en-US', options).replace(',', '');
+        elements.lastDetection.textContent = formatted;
     } else {
         elements.lastDetection.textContent = 'Never';
     }

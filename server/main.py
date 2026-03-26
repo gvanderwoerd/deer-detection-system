@@ -180,6 +180,9 @@ class DeerDetectionSystem:
                                 # Update PIR status if changed
                                 if self.motion_active != is_active:
                                     self.motion_active = is_active
+                                    # Track last motion detection time
+                                    if is_active:
+                                        self.last_detection_time = datetime.now()
                                     socketio.emit('motion_status', {'active': is_active})
                                     logger.info(f"PIR: {'MOTION DETECTED' if is_active else 'no motion'}")
 
@@ -555,10 +558,13 @@ def api_motion():
     try:
         data = request.json
         is_active = data.get('active', False)
-        
+
         # Update system state
         system.motion_active = is_active
-        
+        # Track last motion detection time
+        if is_active:
+            system.last_detection_time = datetime.now()
+
         # Broadcast to all clients
         socketio.emit('motion_status', {'active': is_active})
         
