@@ -51,6 +51,20 @@ Automated animal detection system that activates SmartLife valves to deter anima
 
 ## Recent Updates
 
+### 2026-03-25: Phase 2 Optimization - Performance & Auto-cleanup (Commit 2100b22)
+- **Performance:** Removed redundant /api/motion endpoint (motion via stream headers only)
+- **Frontend:** HTTP polling now WebSocket-fallback only (90%+ reduction in requests)
+- **Auto-cleanup:** Detection images auto-deleted after 7 days (prevents disk bloat)
+- **Impact:** Reduced server load, managed disk space, cleaner API
+- **Status:** ✅ System optimized for long-term operation
+
+### 2026-03-25: Phase 1 Cleanup - Dead Code Removal & Security (Commit a098fab)
+- **Security:** Moved Tuya credentials to .env file (no longer in git)
+- **Dead Code:** Removed 100 lines (unused methods, imports, test blocks)
+- **File Cleanup:** Deleted 26MB old log archive
+- **Impact:** Secure credentials, cleaner codebase, 26MB disk space freed
+- **Status:** ✅ Security hardened, code maintainability improved
+
 ### 2026-03-25: Last Detection Timestamp Enhancement (Commit ac736db)
 - **Feature:** "Last Detection" dashboard field now shows last PIR motion detection
 - **Display Format:** "March 25 2026 7:37:43 PM" (full date + 12-hour time)
