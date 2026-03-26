@@ -1,7 +1,7 @@
 # Deer Detection Sprinkler System
 
 **Status:** ✅ Fully Operational
-**Last Updated:** 2026-03-14
+**Last Updated:** 2026-03-25
 
 ---
 
@@ -28,7 +28,8 @@ Automated animal detection system that activates SmartLife valves to deter anima
 - **SmartLife Valves** - 4x water valves controlled via Tuya Cloud API
 - **Detection Gallery** - Automatic capture and storage of detections
 
-**Detection Targets:** Cat, Dog, Horse, Sheep, Cow, Elephant, Bear, Zebra, Giraffe
+**Detection Targets:** Cat, Dog, Horse, Sheep, Cow, Elephant, Bear, Zebra, Giraffe (all trigger sprinkler)
+**Gallery Saves:** Only Deer (horse/bear proxies), Cow, Sheep (meaningful detections)
 **Safety:** Never activates if person detected
 
 ---
@@ -50,6 +51,15 @@ Automated animal detection system that activates SmartLife valves to deter anima
 ---
 
 ## Recent Updates
+
+### 2026-03-25: Detection Gallery Filtering (Commit 9a03462)
+- **Feature:** Gallery now only saves deer, cow, sheep detections (not cats, dogs, etc.)
+- **Rationale:** Reduces clutter - other animals still trigger sprinkler but don't fill gallery
+- **Implementation:** Added SAVE_CLASS_IDS config [17, 18, 19, 21] for filtering
+- **Detection.py:** Added class_id field to detection data
+- **Main.py:** Filters saves based on SAVE_CLASS_IDS before storage
+- **Logging:** Shows "Detection not saved" for filtered animals vs "Detection image saved"
+- **Status:** ✅ Gallery focused on meaningful detections only
 
 ### 2026-03-25: Phase 2 Optimization - Performance & Auto-cleanup (Commit 2100b22)
 - **Performance:** Removed redundant /api/motion endpoint (motion via stream headers only)
