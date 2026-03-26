@@ -30,9 +30,10 @@ logs/
 *.old
 backups/
 
-# Detection images (generated at runtime)
+# Detection images and metadata (generated at runtime)
 server/detections/*.jpg
 server/detections/*.png
+server/detections/detections.json
 
 # Runtime
 *.pid
