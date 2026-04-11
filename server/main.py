@@ -116,6 +116,7 @@ class DeerDetectionSystem:
         self.state = SystemState.IDLE
         self.enabled = True
         self.motion_active = False  # Real-time PIR sensor state
+        self.wifi_signal = None  # WiFi signal strength (RSSI in dBm)
 
         # Session tracking
         self.session_start = None
@@ -189,6 +190,20 @@ class DeerDetectionSystem:
                                         self.trigger_motion()
                                     socketio.emit('motion_status', {'active': is_active})
                                     logger.info(f"PIR: {'MOTION DETECTED' if is_active else 'no motion'}")
+
+                        # Parse WiFi signal strength from headers
+                        wifi_header_marker = b'X-WiFi-Signal: '
+                        wifi_pos = bytes_buffer.find(wifi_header_marker)
+                        if wifi_pos != -1:
+                            # Extract signal strength value (RSSI in dBm)
+                            signal_start = wifi_pos + len(wifi_header_marker)
+                            signal_end = bytes_buffer.find(b'\r\n', signal_start)
+                            if signal_end != -1:
+                                try:
+                                    rssi = int(bytes_buffer[signal_start:signal_end].decode('utf-8').strip())
+                                    self.wifi_signal = rssi
+                                except ValueError:
+                                    pass  # Ignore parsing errors
 
                         # Find JPEG boundaries
                         a = bytes_buffer.find(b'\xff\xd8')  # JPEG start
@@ -490,6 +505,7 @@ class DeerDetectionSystem:
             'state': self.state.value,
             'enabled': self.enabled,
             'motion_active': self.motion_active,
+            'wifi_signal': self.wifi_signal,  # WiFi RSSI in dBm
             'valve_on': valve_status.get('is_on', False),
             'valve_configured': valve_status.get('configured', False),
             'valve_api_error': valve_status.get('api_error'),

@@ -50,6 +50,7 @@ function initElements() {
         videoFeed: document.getElementById('video-feed'),
         noFeedMessage: document.getElementById('no-feed-message'),
         pirStatus: document.getElementById('pir-status'),
+        wifiSignal: document.getElementById('wifi-signal'),
 
         // Buttons
         btnEnable: document.getElementById('btn-enable'),
@@ -209,6 +210,35 @@ function updateStatus(status) {
         elements.valveStatus.textContent = 'OFF';
         elements.valveStatus.className = 'status-badge disabled';
         elements.valveStatus.title = '';
+    }
+
+    // WiFi signal strength
+    if (status.wifi_signal !== null && status.wifi_signal !== undefined) {
+        const rssi = status.wifi_signal;
+        let signalText, signalClass;
+
+        // RSSI ranges: -30 (excellent) to -90 (terrible)
+        if (rssi >= -50) {
+            signalText = 'Excellent';
+            signalClass = 'status-badge enabled';  // Green
+        } else if (rssi >= -60) {
+            signalText = 'Good';
+            signalClass = 'status-badge enabled';  // Green
+        } else if (rssi >= -70) {
+            signalText = 'Fair';
+            signalClass = 'status-badge active';  // Orange/Yellow
+        } else {
+            signalText = 'Poor';
+            signalClass = 'status-badge disabled';  // Red
+        }
+
+        elements.wifiSignal.textContent = `${signalText} (${rssi} dBm)`;
+        elements.wifiSignal.className = signalClass;
+        elements.wifiSignal.title = `Signal strength: ${rssi} dBm`;
+    } else {
+        elements.wifiSignal.textContent = '--';
+        elements.wifiSignal.className = 'status-badge disabled';
+        elements.wifiSignal.title = 'No signal data';
     }
 
     // Last detection

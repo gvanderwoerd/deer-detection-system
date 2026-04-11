@@ -372,7 +372,7 @@ void loop() {
         break;
       }
 
-      // Send frame with PIR status in headers
+      // Send frame with PIR status and WiFi signal strength in headers
       client.println("--frame");
       client.println("Content-Type: image/jpeg");
       client.print("Content-Length: ");
@@ -380,6 +380,9 @@ void loop() {
       // Include PIR sensor status in custom header
       client.print("X-PIR-Status: ");
       client.println(digitalRead(PIR_PIN) == HIGH ? "active" : "inactive");
+      // Include WiFi signal strength (RSSI in dBm)
+      client.print("X-WiFi-Signal: ");
+      client.println(WiFi.RSSI());
       client.println();
       client.write(fb->buf, fb->len);
       client.println();
