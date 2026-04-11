@@ -66,6 +66,54 @@ function initElements() {
 // Camera state
 let cameraActive = false;
 let cameraKeepAliveInterval = null;
+let previousMotionActive = false;  // Track previous motion state for auto-start
+
+// Camera control functions
+async function startCamera() {
+    if (cameraActive) return;  // Already active
+
+    addLogEntry('camera', 'Activating live camera feed...');
+    const result = await apiCall('/trigger', 'POST');
+
+    if (result.success !== false) {
+        cameraActive = true;
+        if (elements.btnToggleCamera) {
+            elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
+            elements.btnToggleCamera.classList.remove('btn-secondary');
+            elements.btnToggleCamera.classList.add('btn-warning');
+        }
+        if (elements.noFeedMessage) {
+            elements.noFeedMessage.style.display = 'none';
+        }
+
+        // Keep camera alive by polling status
+        cameraKeepAliveInterval = setInterval(() => {
+            if (cameraActive) {
+                pollStatus();
+            }
+        }, 3000);
+
+        addLogEntry('camera', 'Camera feed active');
+    }
+}
+
+function stopCamera() {
+    if (!cameraActive) return;  // Already stopped
+
+    cameraActive = false;
+    if (elements.btnToggleCamera) {
+        elements.btnToggleCamera.textContent = '📹 View Live Camera';
+        elements.btnToggleCamera.classList.remove('btn-warning');
+        elements.btnToggleCamera.classList.add('btn-secondary');
+    }
+
+    if (cameraKeepAliveInterval) {
+        clearInterval(cameraKeepAliveInterval);
+        cameraKeepAliveInterval = null;
+    }
+
+    addLogEntry('camera', 'Camera feed stopped');
+}
 
 // Initialize WebSocket connection
 function connectWebSocket() {
@@ -208,9 +256,17 @@ function handleMotionStatus(data) {
     if (data.active) {
         elements.pirStatus.textContent = 'MOTION DETECTED';
         elements.pirStatus.className = 'status-badge enabled';
+
+        // Auto-start camera when motion detected (if not already active)
+        if (!previousMotionActive && !cameraActive) {
+            console.log('[AUTO-START] Motion detected, starting camera automatically...');
+            startCamera();
+        }
+        previousMotionActive = true;
     } else {
         elements.pirStatus.textContent = 'NO MOTION';
         elements.pirStatus.className = 'status-badge disabled';
+        previousMotionActive = false;
     }
 }
 
@@ -356,39 +412,9 @@ function setupEventListeners() {
 
     elements.btnToggleCamera.addEventListener('click', async () => {
         if (!cameraActive) {
-            // Activate camera
-            addLogEntry('camera', 'Activating live camera feed...');
-            const result = await apiCall('/trigger', 'POST');
-
-            if (result.success !== false) {
-                cameraActive = true;
-                elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
-                elements.btnToggleCamera.classList.remove('btn-secondary');
-                elements.btnToggleCamera.classList.add('btn-warning');
-                elements.noFeedMessage.style.display = 'none';
-
-                // Keep camera alive by polling status
-                cameraKeepAliveInterval = setInterval(() => {
-                    if (cameraActive) {
-                        pollStatus();
-                    }
-                }, 3000);
-
-                addLogEntry('camera', 'Camera feed active');
-            }
+            await startCamera();
         } else {
-            // Deactivate camera
-            cameraActive = false;
-            elements.btnToggleCamera.textContent = '📹 View Live Camera';
-            elements.btnToggleCamera.classList.remove('btn-warning');
-            elements.btnToggleCamera.classList.add('btn-secondary');
-
-            if (cameraKeepAliveInterval) {
-                clearInterval(cameraKeepAliveInterval);
-                cameraKeepAliveInterval = null;
-            }
-
-            addLogEntry('camera', 'Camera feed stopped');
+            stopCamera();
         }
     });
 
