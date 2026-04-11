@@ -184,6 +184,9 @@ class DeerDetectionSystem:
                                     # Track last motion detection time
                                     if is_active:
                                         self.last_detection_time = datetime.now()
+                                        # Auto-trigger detection when PIR detects motion
+                                        logger.info("🎯 PIR: MOTION DETECTED - Auto-triggering detection")
+                                        self.trigger_motion()
                                     socketio.emit('motion_status', {'active': is_active})
                                     logger.info(f"PIR: {'MOTION DETECTED' if is_active else 'no motion'}")
 
