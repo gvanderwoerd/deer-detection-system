@@ -24,15 +24,16 @@ DETECTION_CONFIDENCE = 0.25  # Confidence threshold (0.0-1.0) - lowered for test
 # 15: cat, 16: dog, 17: horse, 18: sheep, 19: cow, 20: elephant, 21: bear, 22: zebra, 23: giraffe
 TARGET_CLASS_IDS = [15, 16, 17, 18, 19, 20, 21, 22, 23]
 
-# COCO class IDs to SAVE to detection gallery (only deer/cow/sheep)
+# COCO class IDs to SAVE to detection gallery
 # Note: COCO doesn't have "deer" - using horse(17) and bear(21) as proxies
-SAVE_CLASS_IDS = [17, 18, 19, 21]  # horse(deer proxy), sheep, cow, bear(deer proxy)
+# Person (0) is saved for testing but will NOT activate sprinkler (safety check)
+SAVE_CLASS_IDS = [0, 17, 18, 19, 21]  # person(test), horse(deer proxy), sheep, cow, bear(deer proxy)
 
 PERSON_CLASS_ID = 0  # COCO: person=0 (safety check - never activate with people)
 MODEL_PATH = 'yolov8n.pt'  # YOLOv8 nano model
 
 # === System Behavior ===
-ACTIVE_WINDOW_SECONDS = 600  # 10 minutes after motion detected (ESP32-CAM awake time)
+ACTIVE_WINDOW_SECONDS = 60  # 60 seconds after motion detected (enough time to identify animal)
 SPRINKLER_DURATION_SECONDS = 120  # Sprinkler runs for 2 minutes
 COOLDOWN_PERIOD_SECONDS = 120  # Wait 2 minutes between activations
 MAX_DETECTIONS_PER_SESSION = 3  # Max times to activate sprinkler in one session

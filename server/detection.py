@@ -64,17 +64,24 @@ class DeerDetector:
                     # Log all detections for debugging
                     logger.info(f"Detected: {class_name} (class {class_id}) with confidence: {confidence:.2f}")
 
+                    # Get bounding box coordinates (used for both animals and people)
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+
                     # SAFETY CHECK: Detect if person is present
                     if class_id == self.person_class_id:
                         person_detected = True
                         logger.warning(f"⚠️ PERSON DETECTED - Will NOT activate sprinkler!")
+                        # Add person to detections for gallery saving (testing purposes)
+                        detections.append({
+                            'bbox': (int(x1), int(y1), int(x2), int(y2)),
+                            'confidence': confidence,
+                            'class': class_name,
+                            'class_id': class_id
+                        })
 
                     # Check if this is a target animal (deer, cow, sheep)
                     if class_id in self.target_class_ids:
                         animal_detected = True
-
-                        # Get bounding box coordinates
-                        x1, y1, x2, y2 = box.xyxy[0].tolist()
 
                         detections.append({
                             'bbox': (int(x1), int(y1), int(x2), int(y2)),

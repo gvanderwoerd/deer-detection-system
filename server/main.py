@@ -323,6 +323,11 @@ class DeerDetectionSystem:
             self.log_event('trigger', "Motion detected during cooldown - ignoring")
             return False
 
+        # Skip if already in active state (don't restart session)
+        if self.state == SystemState.ACTIVE:
+            logger.debug("Motion detected but already in active state - continuing current session")
+            return False
+
         self.log_event('trigger', "Motion detected - activating camera")
         self.change_state(SystemState.ACTIVE)
 
@@ -369,11 +374,12 @@ class DeerDetectionSystem:
                         with self.frame_lock:
                             self.annotated_jpg = buffer.tobytes()
 
-                    if deer_detected:
-                        self._handle_deer_detection(detections, annotated_frame)
+                    # Handle any detections (animals or people)
+                    if detections:
+                        self._handle_detection(detections, annotated_frame, deer_detected)
                 else:
-                    # Log when no frame is available
-                    if frame_check_count % 20 == 0:
+                    # Log when no frame is available (only occasionally to reduce spam)
+                    if frame_check_count % 100 == 0:
                         logger.warning(f"No frame available for detection (check #{frame_check_count})")
 
                 time.sleep(0.5)  # Check twice per second
@@ -386,18 +392,23 @@ class DeerDetectionSystem:
         thread = threading.Thread(target=session_worker, daemon=True)
         thread.start()
 
-    def _handle_deer_detection(self, detections, annotated_frame):
-        """Handle target animal detection (deer, cow, sheep)"""
+    def _handle_detection(self, detections, annotated_frame, should_activate_sprinkler):
+        """Handle detection (animals or people)"""
         animal_type = detections[0]['class']
         class_id = detections[0].get('class_id')
 
-        # Only save deer, cow, sheep detections to gallery (not cats, dogs, etc.)
+        # Save to gallery if in save list (deer, cow, sheep, person)
         if class_id in SAVE_CLASS_IDS:
             storage = get_detection_storage()
             saved_filename = storage.save_detection(annotated_frame, detections, animal_type)
             logger.info(f"📸 Detection image saved: {saved_filename} ({animal_type})")
         else:
             logger.info(f"ℹ️ Detection not saved: {animal_type} (class {class_id}) - not in save list")
+
+        # Only activate sprinkler for animals (not people)
+        if not should_activate_sprinkler:
+            logger.info(f"ℹ️ Sprinkler activation blocked (person present or non-target animal)")
+            return
 
         # Check if we've hit the max detections for this session
         if self.session_detections >= MAX_DETECTIONS_PER_SESSION:
