@@ -586,8 +586,14 @@ async function updateHealthPanel() {
         const quotaElem = document.getElementById('healthQuota');
         if (quotaElem && apiUsage) {
             const usage = apiUsage.this_month.quota_usage_pct || 0;
+            const resetInfo = apiUsage.reset_info || {};
+            const resetDate = resetInfo.reset_date || 'Unknown';
+            const burnRate = resetInfo.daily_burn_rate_pct || 0;
+            const depletion = resetInfo.projected_depletion_date || 'Not available';
+
             quotaElem.textContent = `${usage.toFixed(1)}% used`;
             quotaElem.style.color = usage > 90 ? '#ff1744' : (usage > 75 ? '#ffa726' : '#00c853');
+            quotaElem.title = `Reset: ${resetDate}\nBurn rate: ${burnRate.toFixed(2)}%/day\nProjected depletion: ${depletion}`;
         }
 
         // Success rate

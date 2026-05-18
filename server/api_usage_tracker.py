@@ -34,6 +34,7 @@ class APIUsageTracker:
         self.calls_this_month = []
         self.warnings = []
         self.current_month = datetime.now().strftime("%Y-%m")
+        self.reset_timestamp = time.time()  # Track when quota was last reset
 
         # Load previous stats if available
         self._load_stats()
@@ -111,6 +112,20 @@ class APIUsageTracker:
         for _, endpoint, _ in self.calls_this_month:
             endpoint_counts[endpoint] = endpoint_counts.get(endpoint, 0) + 1
 
+        # Reset timing and projections
+        days_since_reset = (now - self.reset_timestamp) / 86400  # Convert seconds to days
+        reset_date = datetime.fromtimestamp(self.reset_timestamp).strftime("%Y-%m-%d")
+
+        # Calculate daily burn rate and projection
+        daily_rate_pct = (quota_usage_pct / max(days_since_reset, 0.1)) if days_since_reset > 0 else 0
+
+        # Projected depletion date (when quota will hit 100%)
+        projected_depletion = None
+        if daily_rate_pct > 0 and quota_usage_pct < 100:
+            days_until_depletion = (100 - quota_usage_pct) / daily_rate_pct
+            depletion_timestamp = now + (days_until_depletion * 86400)
+            projected_depletion = datetime.fromtimestamp(depletion_timestamp).strftime("%Y-%m-%d")
+
         return {
             'today': {
                 'count': today_calls,
@@ -124,6 +139,12 @@ class APIUsageTracker:
                 'quota_remaining': quota_remaining,
                 'quota_usage_pct': round(quota_usage_pct, 1),
                 'endpoints': endpoint_counts
+            },
+            'reset_info': {
+                'reset_date': reset_date,
+                'days_since_reset': round(days_since_reset, 1),
+                'daily_burn_rate_pct': round(daily_rate_pct, 2),
+                'projected_depletion_date': projected_depletion
             },
             'warnings': warnings,
             'health_status': 'critical' if quota_usage_pct >= QUOTA_CRITICAL_THRESHOLD * 100
@@ -148,6 +169,7 @@ class APIUsageTracker:
         self.calls_this_month = []
         self.current_month = new_month
         self.warnings = []
+        self.reset_timestamp = time.time()  # Update reset timestamp
         self._save_stats()
 
     def _save_stats(self):
@@ -155,6 +177,7 @@ class APIUsageTracker:
         try:
             data = {
                 'current_month': self.current_month,
+                'reset_timestamp': self.reset_timestamp,
                 'calls_this_month': [
                     {
                         'timestamp': t,
@@ -178,12 +201,14 @@ class APIUsageTracker:
                     data = json.load(f)
 
                 self.current_month = data.get('current_month', self.current_month)
+                self.reset_timestamp = data.get('reset_timestamp', self.reset_timestamp)
                 calls_data = data.get('calls_this_month', [])
 
                 # Check if month has changed
                 if self.current_month != datetime.now().strftime("%Y-%m"):
                     logger.info(f"Loaded stats from previous month ({self.current_month}). Discarding.")
                     self.calls_this_month = []
+                    self.reset_timestamp = time.time()  # Reset timestamp for new month
                 else:
                     # Restore calls with some validation
                     for call in calls_data:

@@ -1,38 +1,51 @@
 """
 Integration Test Suite for Sprinkler Control System
 Tests the full detection → activation → verification flow
+
+NOTE: Tests use isolated tracker instances with temporary storage
+to avoid polluting the real API quota tracker.
 """
 
 import pytest
 import time
+import tempfile
+from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from api_usage_tracker import APIUsageTracker, get_tracker as get_api_tracker
 from activation_metrics import ActivationMetrics, get_metrics as get_activation_metrics
 
 
+@pytest.fixture
+def isolated_tracker():
+    """Create an isolated tracker with temp storage for testing"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tracker = APIUsageTracker(data_dir=tmpdir)
+        yield tracker
+
+
 class TestAPIUsageTracker:
     """Test API quota tracking and monitoring"""
 
-    def test_tracker_initialization(self):
+    def test_tracker_initialization(self, isolated_tracker):
         """Test tracker initializes correctly"""
-        tracker = APIUsageTracker()
+        tracker = isolated_tracker
         assert tracker is not None
         assert tracker.calls_today is not None
         assert tracker.calls_this_month is not None
 
-    def test_track_api_call(self):
+    def test_track_api_call(self, isolated_tracker):
         """Test tracking individual API calls"""
-        tracker = APIUsageTracker()
+        tracker = isolated_tracker
         initial_count = len(tracker.calls_this_month)
 
         tracker.track_call('sendcommand', 245.5)
         assert len(tracker.calls_this_month) == initial_count + 1
 
-    def test_quota_calculation(self):
+    def test_quota_calculation(self, isolated_tracker):
         """Test quota usage percentage calculation"""
-        tracker = APIUsageTracker()
+        tracker = isolated_tracker
 
-        # Add calls
+        # Add calls to represent 100 API calls
         for i in range(100):
             tracker.track_call('sendcommand', 100.0)
 
@@ -42,20 +55,22 @@ class TestAPIUsageTracker:
         # 100 calls / 10000 limit = 1%
         assert 0.9 < quota_pct < 1.1  # Allow 0.1% margin
 
-    def test_quota_warnings(self):
+    def test_quota_warnings(self, isolated_tracker):
         """Test quota warning thresholds"""
-        tracker = APIUsageTracker()
+        tracker = isolated_tracker
 
         # Add calls to trigger warning threshold (80%)
+        # Use isolated tracker so real quota isn't affected
         for i in range(8000):
             tracker.track_call('sendcommand', 100.0)
 
         stats = tracker.get_stats()
         assert len(stats['warnings']) > 0  # Should have warnings
+        assert 'WARNING' in stats['warnings'][0]
 
-    def test_latency_tracking(self):
+    def test_latency_tracking(self, isolated_tracker):
         """Test API latency calculation"""
-        tracker = APIUsageTracker()
+        tracker = isolated_tracker
 
         tracker.track_call('sendcommand', 245.5)
         tracker.track_call('sendcommand', 187.2)

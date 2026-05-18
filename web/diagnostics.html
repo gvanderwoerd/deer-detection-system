@@ -229,7 +229,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    displayDiagnostics(data.diagnostics);
+                    await displayDiagnostics(data.diagnostics);
                 } else {
                     displayError(data.error || 'Unknown error');
                 }
@@ -242,7 +242,7 @@
             }
         }
 
-        function displayDiagnostics(diagnostics) {
+        async function displayDiagnostics(diagnostics) {
             const summary = document.getElementById('resultsSummary');
             const results = document.getElementById('testResults');
             const stats = document.getElementById('apiStats');
@@ -265,6 +265,67 @@
                 `;
                 results.appendChild(testDiv);
             });
+
+            // Fetch and display API usage stats
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+
+                if (data.detailed && data.detailed.api_usage) {
+                    displayApiStats(data.detailed.api_usage);
+                }
+            } catch (error) {
+                console.error('Failed to fetch API stats:', error);
+            }
+        }
+
+        function displayApiStats(apiUsage) {
+            const statsElem = document.getElementById('apiStats');
+            if (!statsElem) return;
+
+            const thisMonth = apiUsage.this_month || {};
+            const resetInfo = apiUsage.reset_info || {};
+
+            let html = '<div class="api-stats"><h3>📊 API Usage Statistics</h3>';
+
+            // Monthly quota
+            html += '<div class="api-stat-item">';
+            html += `<div class="api-stat-value">${(thisMonth.quota_usage_pct || 0).toFixed(1)}%</div>`;
+            html += '<div class="api-stat-label">Monthly Usage</div>';
+            html += '</div>';
+
+            // Calls remaining
+            html += '<div class="api-stat-item">';
+            html += `<div class="api-stat-value">${thisMonth.quota_remaining || 0}</div>`;
+            html += '<div class="api-stat-label">Calls Remaining</div>';
+            html += '</div>';
+
+            // Reset date
+            html += '<div class="api-stat-item">';
+            html += `<div class="api-stat-value">${resetInfo.reset_date || 'N/A'}</div>`;
+            html += '<div class="api-stat-label">Reset Date</div>';
+            html += '</div>';
+
+            // Daily burn rate
+            html += '<div class="api-stat-item">';
+            html += `<div class="api-stat-value">${(resetInfo.daily_burn_rate_pct || 0).toFixed(2)}%</div>`;
+            html += '<div class="api-stat-label">Daily Burn Rate</div>';
+            html += '</div>';
+
+            // Projected depletion
+            html += '<div class="api-stat-item">';
+            html += `<div class="api-stat-value">${resetInfo.projected_depletion_date || 'N/A'}</div>`;
+            html += '<div class="api-stat-label">Est. Depletion</div>';
+            html += '</div>';
+
+            // Days since reset
+            html += '<div class="api-stat-item">';
+            html += `<div class="api-stat-value">${(resetInfo.days_since_reset || 0).toFixed(1)}</div>`;
+            html += '<div class="api-stat-label">Days Since Reset</div>';
+            html += '</div>';
+
+            html += '</div>';
+            statsElem.innerHTML = html;
         }
 
         function displayError(error) {
