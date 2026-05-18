@@ -163,6 +163,26 @@ Automated animal detection system that activates SmartLife valves to deter anima
 - **Diagnose**: http://192.168.1.15:5000/diagnostics (troubleshooting)
 - **API**: /api/health, /api/metrics, /api/usage-stats (programmatic)
 
+### 2026-05-18: API Quota Timeline Tracking (Commit 8ab714a)
+- **Feature:** Comprehensive API quota tracking with reset timeline metrics
+- **Metrics Added:**
+  - `reset_date`: Date when monthly quota was last reset (YYYY-MM-DD)
+  - `days_since_reset`: Number of days elapsed since quota reset
+  - `daily_burn_rate_pct`: Percentage of quota consumed per day (calculated)
+  - `projected_depletion_date`: Estimated date when quota reaches 100%
+- **Implementation:**
+  - Added `reset_timestamp` tracking in APIUsageTracker
+  - Persists reset_timestamp in api_stats.json for recovery after restart
+  - Automatic reset_timestamp update when month changes
+  - Dashboard tooltip shows reset date + burn rate + depletion estimate
+  - Diagnostics page displays full timeline metrics
+- **Benefit:** Users can now understand quota consumption patterns and plan ahead for renewal
+- **Files Modified:**
+  - server/api_usage_tracker.py - Reset timeline calculation
+  - web/app.js - Health panel tooltip with timeline info
+  - web/diagnostics.html - API statistics display with timeline metrics
+  - server/test_integration.py - Use isolated tracker for test isolation
+
 ---
 
 ### 2026-03-25: Detection Gallery Filtering (Commit 9a03462)
