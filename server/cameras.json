@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "cameras": [
+    {
+      "id": "camera-default",
+      "name": "Default Camera",
+      "hostname": "esp32cam.local",
+      "stream_url": "http://esp32cam.local:81/",
+      "enabled": true,
+      "created_at": "2026-05-18T16:26:13.265667",
+      "last_seen": null,
+      "position": 0,
+      "detection_config": {
+        "enabled_objects": {
+          "cat": true,
+          "dog": true,
+          "horse": true,
+          "sheep": true,
+          "cow": true,
+          "elephant": true,
+          "bear": true,
+          "zebra": true,
+          "giraffe": true
+        },
+        "confidence_threshold": 0.25,
+        "save_person_detections": false
+      },
+      "device_assignments": [
+        {
+          "device_id": "eb2f5498a4e53362f5lumi",
+          "duration_seconds": 120
+        }
+      ],
+      "timing": {
+        "active_window_seconds": 60,
+        "cooldown_period_seconds": 120,
+        "max_detections_per_session": 3
+      },
+      "state": {
+        "online": false,
+        "session_active": false,
+        "session_detections": 0,
+        "cooldown_until": null,
+        "last_detection": null
+      }
+    }
+  ]
+}

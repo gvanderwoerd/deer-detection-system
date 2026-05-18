@@ -23,6 +23,7 @@ from detection_storage import get_detection_storage
 from model_recommendation import ModelRecommender, get_model_recommendation_api
 from activation_metrics import get_metrics as get_activation_metrics
 from api_usage_tracker import get_tracker as get_api_tracker
+from camera_manager import get_camera_manager
 from config import (
     SERVER_HOST,
     SERVER_PORT,
@@ -115,11 +116,14 @@ class DeerDetectionSystem:
         self.detector = DeerDetector()
         self.valve = ValveController()
 
+        # Initialize camera manager (multi-camera support)
+        self.camera_manager = get_camera_manager()
+
         # System state
         self.state = SystemState.IDLE
         self.enabled = True
-        self.motion_active = False  # Real-time PIR sensor state
-        self.wifi_signal = None  # WiFi signal strength (RSSI in dBm)
+        self.motion_active = False  # Real-time PIR sensor state (from first camera)
+        self.wifi_signal = None  # WiFi signal strength (RSSI in dBm) (from first camera)
 
         # Session tracking
         self.session_start = None
@@ -130,7 +134,7 @@ class DeerDetectionSystem:
         # Event log
         self.event_log = deque(maxlen=MAX_LOG_ENTRIES)
 
-        # Camera stream - shared frame buffer
+        # Camera stream - shared frame buffer (for backward compatibility, use first camera)
         self.current_frame = None
         self.current_jpg = None  # Store JPEG bytes for streaming
         self.annotated_jpg = None  # Store annotated frame with detections
@@ -141,131 +145,98 @@ class DeerDetectionSystem:
         self.last_frame_time = None  # Track when frames are received
         self.auto_detection_active = False  # Track if auto-detection is running
 
-        # Start continuous frame capture (includes PIR status from stream headers)
+        # Legacy frame capture for backward compatibility (uses first camera)
+        # Note: Multi-camera support uses CameraManager for per-camera capture
         self._start_frame_capture()
 
         logger.info("System initialized successfully")
 
     def _start_frame_capture(self):
-        """Start continuous frame capture from ESP32-CAM"""
+        """
+        Start continuous frame capture from CameraManager (first camera for backward compatibility)
+
+        Note: In multi-camera mode, each camera has its own capture thread in CameraManager.
+        This legacy method pulls frames from the first available camera for backward compatibility.
+        """
         def capture_worker():
-            logger.info("Starting continuous frame capture thread")
-            connection_attempts = 0
+            logger.info("Starting legacy frame capture thread (using first camera from CameraManager)")
             while True:
                 try:
-                    # Only skip connection if system is DISABLED (not IDLE)
-                    # IDLE means waiting for motion, but camera can still be viewed
+                    # Only skip if system is DISABLED
                     if self.state == SystemState.DISABLED:
                         time.sleep(1)
                         continue
 
-                    connection_attempts += 1
-                    # Only log every 10th connection attempt (reduce noise)
-                    if connection_attempts == 1 or connection_attempts % 10 == 0:
-                        logger.debug(f"Connecting to ESP32-CAM stream (attempt {connection_attempts})...")
-                    stream = requests.get(ESP32_CAM_STREAM_URL, stream=True, timeout=10)
-                    connection_attempts = 0  # Reset on successful connection
-                    bytes_buffer = b''
-                    frame_count = 0
+                    # Get first available camera from CameraManager
+                    cameras = self.camera_manager.get_all_cameras()
+                    if not cameras:
+                        logger.warning("No cameras available in CameraManager")
+                        time.sleep(5)
+                        continue
 
-                    for chunk in stream.iter_content(chunk_size=1024):
-                        bytes_buffer += chunk
+                    first_camera_id = cameras[0]['id']
+                    camera = self.camera_manager.get_camera(first_camera_id)
 
-                        # Parse PIR status from multipart headers (before JPEG data)
-                        pir_header_marker = b'X-PIR-Status: '
-                        pir_pos = bytes_buffer.find(pir_header_marker)
-                        if pir_pos != -1:
-                            # Extract PIR status value (everything until \r\n)
-                            status_start = pir_pos + len(pir_header_marker)
-                            status_end = bytes_buffer.find(b'\r\n', status_start)
-                            if status_end != -1:
-                                pir_status = bytes_buffer[status_start:status_end].decode('utf-8').strip()
-                                is_active = (pir_status == 'active')
+                    if not camera or not camera.current_jpg:
+                        time.sleep(0.1)  # Wait for first frame
+                        continue
 
-                                # Update PIR status if changed
-                                if self.motion_active != is_active:
-                                    self.motion_active = is_active
-                                    # Track last motion detection time
-                                    if is_active:
-                                        self.last_detection_time = datetime.now()
-                                        # Auto-trigger detection when PIR detects motion
-                                        logger.info("🎯 PIR: MOTION DETECTED - Auto-triggering detection")
-                                        self.trigger_motion()
-                                    socketio.emit('motion_status', {'active': is_active})
-                                    logger.info(f"PIR: {'MOTION DETECTED' if is_active else 'no motion'}")
+                    # Pull frame from first camera
+                    with camera.frame_lock:
+                        frame = camera.current_frame
+                        jpg = camera.current_jpg
 
-                        # Parse WiFi signal strength from headers
-                        wifi_header_marker = b'X-WiFi-Signal: '
-                        wifi_pos = bytes_buffer.find(wifi_header_marker)
-                        if wifi_pos != -1:
-                            # Extract signal strength value (RSSI in dBm)
-                            signal_start = wifi_pos + len(wifi_header_marker)
-                            signal_end = bytes_buffer.find(b'\r\n', signal_start)
-                            if signal_end != -1:
-                                try:
-                                    rssi = int(bytes_buffer[signal_start:signal_end].decode('utf-8').strip())
-                                    self.wifi_signal = rssi
-                                except ValueError:
-                                    pass  # Ignore parsing errors
+                    if frame is None:
+                        time.sleep(0.1)
+                        continue
 
-                        # Find JPEG boundaries
-                        a = bytes_buffer.find(b'\xff\xd8')  # JPEG start
-                        b = bytes_buffer.find(b'\xff\xd9')  # JPEG end
+                    # Copy PIR and WiFi status from first camera
+                    if camera.motion_active != self.motion_active:
+                        self.motion_active = camera.motion_active
+                        if camera.motion_active:
+                            self.last_detection_time = datetime.now()
+                            logger.info("🎯 PIR: MOTION DETECTED - Auto-triggering detection")
+                            self.trigger_motion()
+                        socketio.emit('motion_status', {'active': camera.motion_active})
+                        logger.info(f"PIR: {'MOTION DETECTED' if camera.motion_active else 'no motion'}")
 
-                        if a != -1 and b != -1:
-                            jpg = bytes_buffer[a:b+2]
-                            bytes_buffer = bytes_buffer[b+2:]
+                    if camera.wifi_signal and camera.wifi_signal != self.wifi_signal:
+                        self.wifi_signal = camera.wifi_signal
 
-                            # Decode frame
-                            frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    # Add timestamp overlay
+                    self._draw_timestamp(frame)
+                    _, stamped_buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    stamped_jpg = stamped_buffer.tobytes()
 
-                            if frame is not None:
-                                # Add date/time overlay BEFORE storing
-                                # This ensures both live feed and saved gallery images have the timestamp
-                                self._draw_timestamp(frame)
-                                
-                                # Re-encode to JPEG for the live feed (this puts the timestamp on the screen)
-                                _, stamped_buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                                stamped_jpg = stamped_buffer.tobytes()
+                    with self.frame_lock:
+                        self.current_frame = frame
+                        self.current_jpg = stamped_jpg
 
-                                with self.frame_lock:
-                                    self.current_frame = frame
-                                    self.current_jpg = stamped_jpg
+                        # Auto-trigger when camera becomes active
+                        now = time.time()
+                        if self.last_frame_time is None:
+                            logger.info(f"📷 Camera stream active ({camera.name})")
+                            self.stream_active = True
+                            socketio.emit('camera_status', {'active': True})
+                            if not self.auto_detection_active and self.enabled:
+                                self.auto_detection_active = True
+                                threading.Thread(target=self._auto_trigger_detection, daemon=True).start()
 
-                                    # Auto-trigger detection when camera becomes active
-                                    now = time.time()
-                                    if self.last_frame_time is None:
-                                        # Camera just woke up!
-                                        logger.info("📷 ESP32-CAM stream active - AUTO-STARTING detection")
-                                        self.stream_active = True
-                                        socketio.emit('camera_status', {'active': True})
-                                        # Auto-trigger motion detection
-                                        if not self.auto_detection_active and self.enabled:
-                                            self.auto_detection_active = True
-                                            threading.Thread(target=self._auto_trigger_detection, daemon=True).start()
-
-                                    self.last_frame_time = now
-
-                                frame_count += 1
-
-                                # Only log every 1000 frames (reduced noise)
-                                if frame_count % 1000 == 0:
-                                    logger.debug(f"Captured {frame_count} frames (streaming active)")
+                        self.last_frame_time = now
 
                 except Exception as e:
                     logger.error(f"Frame capture error: {e}")
                     with self.frame_lock:
                         self.current_frame = None
                         self.current_jpg = None
-                        # Mark camera as inactive
                         if self.stream_active:
-                            logger.info("📷 ESP32-CAM went to sleep")
+                            logger.info("📷 Camera stream inactive")
                             self.stream_active = False
                             self.last_frame_time = None
                             socketio.emit('camera_status', {'active': False})
-                    time.sleep(5)  # Wait before reconnecting
+                    time.sleep(1)
 
-        thread = threading.Thread(target=capture_worker, daemon=True)
+        thread = threading.Thread(target=capture_worker, daemon=True, name="LegacyFrameCapture")
         thread.start()
 
     def _draw_timestamp(self, frame):
@@ -712,8 +683,42 @@ def generate_frames():
 
 @app.route('/video_feed')
 def video_feed():
-    """Video streaming route"""
+    """Video streaming route (legacy - uses first camera for backward compatibility)"""
     return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route('/video_feed/<camera_id>')
+def video_feed_camera(camera_id):
+    """Per-camera video streaming route"""
+    cm = get_camera_manager()
+    camera = cm.get_camera(camera_id)
+
+    if not camera:
+        return jsonify({'error': 'Camera not found'}), 404
+
+    def generate_frames_for_camera(cam):
+        """Generate frames from specific camera"""
+        logger.info(f"Client connected to video feed for {cam.name}")
+        last_jpg = None
+
+        while True:
+            try:
+                with cam.frame_lock:
+                    jpg = cam.annotated_jpg if cam.annotated_jpg is not None else cam.current_jpg
+
+                if jpg is not None and jpg != last_jpg:
+                    last_jpg = jpg
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+                else:
+                    time.sleep(0.033)  # ~30 FPS
+
+            except Exception as e:
+                logger.error(f"Error streaming frame from {cam.name}: {e}")
+                time.sleep(1)
+
+    return Response(generate_frames_for_camera(camera),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 

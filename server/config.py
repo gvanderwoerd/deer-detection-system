@@ -15,7 +15,10 @@ if env_file.exists():
 # === Network Configuration ===
 SERVER_HOST = '0.0.0.0'  # Listen on all interfaces
 SERVER_PORT = 5000
-ESP32_CAM_STREAM_URL = 'http://esp32cam.local:81/'  # ESP32-CAM via mDNS (hostname)
+ESP32_CAM_STREAM_URL = 'http://esp32cam.local:81/'  # ESP32-CAM via mDNS (hostname) - DEPRECATED: use CameraManager
+
+# === Multi-Camera Configuration ===
+CAMERAS_CONFIG_FILE = 'cameras.json'  # Persistent camera registry (auto-migrates from single-camera setup)
 
 # === Detection Configuration ===
 DETECTION_CONFIDENCE = 0.25  # Confidence threshold (0.0-1.0) - lowered for testing
