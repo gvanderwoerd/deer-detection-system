@@ -955,6 +955,33 @@ def api_detection_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/detection-config', methods=['POST', 'GET'])
+def api_detection_config():
+    """Save or load detection configuration"""
+    try:
+        if request.method == 'POST':
+            # Save detection configuration
+            config = request.get_json()
+            # Configuration is stored client-side in localStorage
+            # This endpoint is here for future server-side enforcement if needed
+            logger.info(f"Detection config received: {config}")
+            return jsonify({'success': True, 'message': 'Configuration saved'})
+        else:
+            # For now, return default config - client handles persistence via localStorage
+            return jsonify({
+                'success': True,
+                'config': {
+                    'deer': True,
+                    'cow': True,
+                    'sheep': True,
+                    'person': False
+                }
+            })
+    except Exception as e:
+        logger.error(f"Error with detection config: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/model-recommendation', methods=['POST'])
 def api_model_recommendation():
     """
