@@ -37,11 +37,11 @@
         "max_detections_per_session": 3
       },
       "state": {
-        "online": false,
+        "online": true,
         "session_active": false,
         "session_detections": 0,
         "cooldown_until": null,
-        "last_detection": null
+        "last_detection": "2026-05-18T16:32:25.442801"
       }
     }
   ]

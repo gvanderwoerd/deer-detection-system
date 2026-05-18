@@ -749,6 +749,159 @@ def handle_disconnect():
 # ===== Main Entry Point =====
 
 
+# ============================================================================
+# CAMERA MANAGEMENT API ROUTES
+# ============================================================================
+
+@app.route('/api/cameras', methods=['GET'])
+def api_get_cameras():
+    """Get all cameras"""
+    try:
+        cm = get_camera_manager()
+        cameras = cm.get_all_cameras()
+        return jsonify({'success': True, 'cameras': cameras})
+    except Exception as e:
+        logger.error(f"Error getting cameras: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cameras', methods=['POST'])
+def api_register_camera():
+    """Register a new camera"""
+    try:
+        data = request.json
+        cm = get_camera_manager()
+
+        # Validate required fields
+        required = ['name', 'hostname', 'stream_url']
+        if not all(f in data for f in required):
+            return jsonify({'success': False, 'error': f'Missing required fields: {required}'}), 400
+
+        # Register camera
+        camera_id = cm.register_camera(
+            name=data['name'],
+            hostname=data['hostname'],
+            stream_url=data['stream_url']
+        )
+
+        if camera_id:
+            logger.info(f"✅ Camera registered: {camera_id} ({data['name']})")
+            return jsonify({'success': True, 'camera_id': camera_id}), 201
+        else:
+            return jsonify({'success': False, 'error': 'Failed to register camera'}), 500
+    except Exception as e:
+        logger.error(f"Error registering camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cameras/<camera_id>', methods=['GET'])
+def api_get_camera(camera_id):
+    """Get camera details"""
+    try:
+        cm = get_camera_manager()
+        camera = cm.get_camera(camera_id)
+
+        if not camera:
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+
+        return jsonify({'success': True, 'camera': camera.to_dict()})
+    except Exception as e:
+        logger.error(f"Error getting camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cameras/<camera_id>', methods=['PUT'])
+def api_update_camera(camera_id):
+    """Update camera configuration"""
+    try:
+        cm = get_camera_manager()
+        data = request.json
+
+        if cm.update_camera(camera_id, data):
+            logger.info(f"✅ Camera updated: {camera_id}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+    except Exception as e:
+        logger.error(f"Error updating camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cameras/<camera_id>', methods=['DELETE'])
+def api_delete_camera(camera_id):
+    """Delete a camera"""
+    try:
+        cm = get_camera_manager()
+
+        if cm.delete_camera(camera_id):
+            logger.info(f"🗑️  Camera deleted: {camera_id}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+    except Exception as e:
+        logger.error(f"Error deleting camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cameras/<camera_id>/test', methods=['POST'])
+def api_test_camera(camera_id):
+    """Test camera connection"""
+    try:
+        cm = get_camera_manager()
+        success, result = cm.test_camera_connection(camera_id)
+
+        if success:
+            logger.info(f"✅ Camera test successful: {camera_id}")
+            return jsonify({'success': True, 'result': result})
+        else:
+            logger.warning(f"⚠️  Camera test failed: {camera_id}")
+            return jsonify({'success': False, 'error': result.get('error', 'Connection failed')}), 500
+    except Exception as e:
+        logger.error(f"Error testing camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cameras/<camera_id>/enable', methods=['POST'])
+def api_enable_camera(camera_id):
+    """Enable a camera"""
+    try:
+        cm = get_camera_manager()
+        camera = cm.get_camera(camera_id)
+
+        if not camera:
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+
+        # Update enabled status
+        if cm.update_camera(camera_id, {'enabled': True}):
+            logger.info(f"✅ Camera enabled: {camera_id}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to enable camera'}), 500
+    except Exception as e:
+        logger.error(f"Error enabling camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/cameras/<camera_id>/disable', methods=['POST'])
+def api_disable_camera(camera_id):
+    """Disable a camera"""
+    try:
+        cm = get_camera_manager()
+        camera = cm.get_camera(camera_id)
+
+        if not camera:
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+
+        # Update enabled status
+        if cm.update_camera(camera_id, {'enabled': False}):
+            logger.info(f"⏸️  Camera disabled: {camera_id}")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to disable camera'}), 500
+    except Exception as e:
+        logger.error(f"Error disabling camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ============================================================================
 # DEVICE MANAGEMENT API ROUTES
