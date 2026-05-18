@@ -198,6 +198,39 @@
             gap: 20px;
         }
 
+        /* Camera Filter Tabs */
+        .camera-filter-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #34495e;
+            padding-bottom: 10px;
+        }
+
+        .camera-tab {
+            padding: 10px 20px;
+            background: #34495e;
+            color: #bdc3c7;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .camera-tab:hover {
+            background: #2c3e50;
+            color: #ecf0f1;
+        }
+
+        .camera-tab.active {
+            background: #3498db;
+            color: white;
+            border-bottom: 3px solid #2980b9;
+        }
+
         .config-checkbox {
             display: flex;
             align-items: center;
@@ -403,6 +436,13 @@
             </div>
         </div>
 
+        <!-- Camera Filter Tabs -->
+        <div id="cameraFilterContainer" style="display: none;">
+            <div class="camera-filter-tabs" id="cameraFilterTabs">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+
         <div class="gallery" id="gallery">
             <div class="loading">Loading detections...</div>
         </div>
@@ -423,16 +463,62 @@
             person: false
         };
 
+        // Camera filtering state
+        let currentCamera = null;  // null = all cameras
+        let cameras = [];
+
         // Load detections and configuration on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadDetectionConfig();
             setupConfigCheckboxes();
+            loadCameras();
             loadDetections();
         });
 
+        async function loadCameras() {
+            try {
+                const response = await fetch('/api/cameras');
+                const data = await response.json();
+
+                if (data.success && data.cameras.length > 1) {
+                    cameras = data.cameras;
+                    renderCameraFilterTabs();
+                    document.getElementById('cameraFilterContainer').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error loading cameras:', error);
+            }
+        }
+
+        function renderCameraFilterTabs() {
+            const tabsContainer = document.getElementById('cameraFilterTabs');
+            const tabs = [
+                { id: null, name: '📷 All Cameras' },
+                ...cameras.map(c => ({ id: c.id, name: `🎥 ${c.name}` }))
+            ];
+
+            tabsContainer.innerHTML = tabs.map(tab => `
+                <button class="camera-tab ${currentCamera === tab.id ? 'active' : ''}"
+                        onclick="selectCamera('${tab.id}')">
+                    ${tab.name}
+                </button>
+            `).join('');
+        }
+
+        function selectCamera(cameraId) {
+            currentCamera = cameraId;
+            renderCameraFilterTabs();
+            loadDetections();
+        }
+
         async function loadDetections() {
             try {
-                const response = await fetch('/api/detections?limit=100');
+                let url = '/api/detections?limit=100';
+                if (currentCamera) {
+                    url += `&camera_id=${currentCamera}`;
+                }
+
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.success) {
@@ -467,32 +553,39 @@
                 return;
             }
 
-            gallery.innerHTML = detections.map(detection => `
-                <div class="detection-card">
-                    <img
-                        src="/api/detections/${detection.filename}"
-                        alt="${detection.animal_type} detection"
-                        class="detection-image"
-                        onclick="openModal('/api/detections/${detection.filename}')"
-                    >
-                    <div class="detection-info">
-                        <div class="detection-header">
-                            <span class="animal-badge ${detection.animal_type}">
-                                ${detection.animal_type}
-                            </span>
-                            <div class="confidence">
-                                <span class="confidence-value">${(detection.confidence * 100).toFixed(0)}%</span>
+            gallery.innerHTML = detections.map(detection => {
+                // Build image path based on whether we have camera_id
+                const imagePath = detection.camera_id
+                    ? `/api/detections/${detection.camera_id}/${detection.filename}`
+                    : `/api/detections/${detection.filename}`;
+
+                return `
+                    <div class="detection-card">
+                        <img
+                            src="${imagePath}"
+                            alt="${detection.animal_type} detection"
+                            class="detection-image"
+                            onclick="openModal('${imagePath}')"
+                        >
+                        <div class="detection-info">
+                            <div class="detection-header">
+                                <span class="animal-badge ${detection.animal_type}">
+                                    ${detection.animal_type}
+                                </span>
+                                <div class="confidence">
+                                    <span class="confidence-value">${(detection.confidence * 100).toFixed(0)}%</span>
+                                </div>
+                            </div>
+                            <div class="detection-time">
+                                📅 ${formatDateTime(detection.timestamp)}
+                            </div>
+                            <div class="detection-count">
+                                ${detection.detection_count} detection${detection.detection_count > 1 ? 's' : ''} in frame
                             </div>
                         </div>
-                        <div class="detection-time">
-                            📅 ${formatDateTime(detection.timestamp)}
-                        </div>
-                        <div class="detection-count">
-                            ${detection.detection_count} detection${detection.detection_count > 1 ? 's' : ''} in frame
-                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function updateStats(stats) {
@@ -617,12 +710,17 @@
             }
 
             try {
+                const body = { filter: filter };
+                if (currentCamera) {
+                    body.camera_id = currentCamera;
+                }
+
                 const response = await fetch('/api/detections/delete', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ filter: filter })
+                    body: JSON.stringify(body)
                 });
 
                 const data = await response.json();
