@@ -1129,6 +1129,42 @@ def api_run_diagnostics():
             'icon': '✓' if quota_health == 'healthy' else ('⚠' if quota_health == 'warning' else '✗')
         })
 
+        # Add detection system information
+        try:
+            storage = get_detection_storage()
+            detection_stats = storage.get_detection_stats()
+            gallery_count = detection_stats.get('total', 0)
+        except:
+            gallery_count = 0
+
+        results['detection_system'] = {
+            'title': 'Detection System Status',
+            'status': 'enabled',
+            'configuration': {
+                'model': 'YOLOv8 Nano',
+                'confidence_threshold': 0.25,
+                'target_animals': ['Cat', 'Dog', 'Horse', 'Sheep', 'Cow', 'Elephant', 'Bear', 'Zebra', 'Giraffe'],
+                'gallery_saves': ['Person (safety review)', 'Horse (deer proxy)', 'Sheep', 'Cow', 'Bear (deer proxy)'],
+                'detection_frequency': '~30 FPS from camera'
+            },
+            'safety_features': [
+                'Person detection blocking - sprinkler won\'t activate if human is in frame',
+                'Session limits - max 3 activations per detection session (60 seconds)',
+                'Cooldown period - 2-minute cooldown between sessions to prevent excessive cycling',
+                'Gallery auto-cleanup - detection images auto-deleted after 7 days'
+            ],
+            'expected_behavior': [
+                'When camera comes online, system captures frames continuously',
+                'YOLOv8 analyzes each frame for animals (9 types monitored)',
+                'Animal detection → sprinkler activation (unless person detected)',
+                'Meaningful detections saved to gallery (deer proxies, livestock)',
+                'All activations logged with confidence scores and latency',
+                'Activation metrics tracked for health monitoring'
+            ],
+            'camera_status': 'Offline (ESP32-CAM) - will auto-connect when powered on',
+            'gallery_count': gallery_count
+        }
+
         # Overall result
         failed = sum(1 for t in results['tests'] if t['status'] == 'fail')
         warned = sum(1 for t in results['tests'] if t['status'] == 'warn')
