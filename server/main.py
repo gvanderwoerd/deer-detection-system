@@ -331,6 +331,19 @@ class DeerDetectionSystem:
         # Broadcast state change
         socketio.emit('state', {'state': new_state.value})
 
+        # Broadcast health status update on state change
+        try:
+            dm = get_device_manager()
+            metrics = get_activation_metrics()
+            tracker = get_api_tracker()
+            socketio.emit('health_update', {
+                'credentials_valid': dm.credentials_valid,
+                'activation_health': metrics.get_health_summary(),
+                'api_quota': tracker.get_stats()['this_month']['quota_usage_pct']
+            })
+        except Exception as e:
+            logger.debug(f"Failed to emit health update: {e}")
+
     def trigger_motion(self):
         """Handle motion detection trigger"""
         if not self.enabled:
