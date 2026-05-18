@@ -519,6 +519,49 @@
                 }, 5000);
             }
         }
+
+        async function initializeSetupPage() {
+            // Check current credential status on page load
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+
+                if (data.success && data.detailed.device_manager.credentials_valid) {
+                    // Credentials are valid - show validated status and load devices
+                    updateCredentialStatus('✓ Validated', 'status-valid');
+                    document.getElementById('deviceSection').style.display = 'block';
+
+                    // Auto-discover devices
+                    try {
+                        const devicesResponse = await fetch('/api/devices');
+                        const devicesData = await devicesResponse.json();
+
+                        if (devicesData.success && devicesData.devices) {
+                            const primarySelect = document.getElementById('primaryValve');
+                            devicesData.devices.forEach(device => {
+                                const option = document.createElement('option');
+                                option.value = device.id;
+                                option.textContent = `${device.name} ${device.online ? '(Online)' : '(Offline)'}`;
+                                primarySelect.appendChild(option);
+                            });
+                        }
+                    } catch (error) {
+                        console.log('Auto-discovery optional - user can validate manually');
+                    }
+                } else {
+                    // Credentials are invalid or not set
+                    updateCredentialStatus('⚠️ Not configured or invalid', 'status-invalid');
+                    document.getElementById('deviceSection').style.display = 'none';
+                }
+            } catch (error) {
+                // If health check fails, assume credentials might be valid but API unreachable
+                console.log('Could not check credentials:', error);
+                updateCredentialStatus('? Status unknown', 'status-unknown');
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initializeSetupPage);
     </script>
 </body>
 </html>
