@@ -20,6 +20,7 @@ import threading
 from detection import DeerDetector
 from valve_control_cloud import CloudValveController as ValveController
 from detection_storage import get_detection_storage
+from model_recommendation import ModelRecommender, get_model_recommendation_api
 from config import (
     SERVER_HOST,
     SERVER_PORT,
@@ -876,6 +877,45 @@ def api_detection_stats():
         return jsonify({'success': True, 'stats': stats})
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/model-recommendation', methods=['POST'])
+def api_model_recommendation():
+    """
+    Get Claude model recommendation for a task
+
+    Request body:
+    {
+        "task_description": "What you want to do",
+        "current_model": "haiku|sonnet|opus" (optional)
+    }
+
+    Returns model recommendation and whether current model is appropriate
+    """
+    try:
+        data = request.get_json()
+        if not data or 'task_description' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Missing required field: task_description'
+            }), 400
+
+        task_description = data['task_description']
+        current_model = data.get('current_model')
+
+        recommendation = get_model_recommendation_api(task_description, current_model)
+
+        logger.info(f"Model recommendation for task: {task_description[:50]}... "
+                   f"-> {recommendation.get('recommended_model', 'Unknown')}")
+
+        return jsonify({
+            'success': True,
+            'recommendation': recommendation
+        })
+
+    except Exception as e:
+        logger.error(f"Error in model recommendation: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
