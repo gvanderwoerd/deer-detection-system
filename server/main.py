@@ -21,6 +21,8 @@ from detection import DeerDetector
 from valve_control_cloud import CloudValveController as ValveController
 from detection_storage import get_detection_storage
 from model_recommendation import ModelRecommender, get_model_recommendation_api
+from activation_metrics import get_metrics as get_activation_metrics
+from api_usage_tracker import get_tracker as get_api_tracker
 from config import (
     SERVER_HOST,
     SERVER_PORT,
@@ -462,13 +464,23 @@ class DeerDetectionSystem:
         # Handle both dict return (new) and bool return (legacy)
         success = result.get('success') if isinstance(result, dict) else result
         verified = result.get('verified', False) if isinstance(result, dict) else False
+        latency_ms = result.get('latency_ms', 0) if isinstance(result, dict) else 0
+        error_msg = result.get('error') if isinstance(result, dict) else None
+
+        # Record activation metrics
+        try:
+            metrics = get_activation_metrics()
+            metrics.record_activation(success=success, verified=verified,
+                                    error=error_msg, latency_ms=latency_ms)
+        except Exception as e:
+            logger.debug(f"Failed to record metrics: {e}")
 
         if success:
             # Log verification status
             if verified:
-                self.log_event('sprinkler', f"✓ Sprinkler activated and verified")
+                self.log_event('sprinkler', f"✓ Sprinkler activated and verified ({latency_ms:.0f}ms)")
             else:
-                self.log_event('sprinkler', f"⚠ Sprinkler command sent but could not verify")
+                self.log_event('sprinkler', f"⚠ Sprinkler command sent but could not verify ({latency_ms:.0f}ms)")
 
             # Wait for sprinkler to finish
             time.sleep(SPRINKLER_DURATION_SECONDS + 1)
@@ -483,8 +495,8 @@ class DeerDetectionSystem:
             if self.state == SystemState.COOLDOWN:
                 self.change_state(SystemState.ACTIVE)
         else:
-            error_msg = result.get('error', 'Unknown error') if isinstance(result, dict) else 'Failed to activate sprinkler'
-            self.log_event('error', f"Failed to activate sprinkler: {error_msg}")
+            error_display = error_msg if error_msg else 'Unknown error'
+            self.log_event('error', f"Failed to activate sprinkler: {error_display}")
             self.change_state(SystemState.ACTIVE)
 
     def enable_system(self):
@@ -966,6 +978,67 @@ def api_model_recommendation():
 
     except Exception as e:
         logger.error(f"Error in model recommendation: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/usage-stats', methods=['GET'])
+def api_usage_stats():
+    """Get API usage statistics and quota monitoring"""
+    try:
+        tracker = get_api_tracker()
+        stats = tracker.get_stats()
+        return jsonify({'success': True, 'stats': stats})
+    except Exception as e:
+        logger.error(f"Error getting usage stats: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/metrics', methods=['GET'])
+def api_activation_metrics():
+    """Get sprinkler activation performance metrics"""
+    try:
+        metrics = get_activation_metrics()
+        stats = metrics.get_metrics()
+        return jsonify({'success': True, 'metrics': stats})
+    except Exception as e:
+        logger.error(f"Error getting metrics: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """Get overall system health status"""
+    try:
+        dm = get_device_manager()
+        metrics = get_activation_metrics()
+        tracker = get_api_tracker()
+
+        health_status = {
+            'timestamp': time.time(),
+            'device_manager': dm.is_healthy(),
+            'activation_metrics': metrics.get_health_summary(),
+            'api_usage': tracker.get_stats()
+        }
+
+        # Determine overall health
+        issues = []
+        if not dm.credentials_valid:
+            issues.append("Invalid API credentials")
+        if not health_status['activation_metrics']['health'] == 'healthy':
+            issues.append(f"Activation health: {health_status['activation_metrics']['health']}")
+        if health_status['api_usage']['health_status'] != 'healthy':
+            issues.append(f"API quota: {health_status['api_usage']['health_status']}")
+
+        overall_health = 'critical' if issues else 'healthy'
+
+        return jsonify({
+            'success': True,
+            'health': overall_health,
+            'issues': issues,
+            'detailed': health_status
+        })
+    except Exception as e:
+        logger.error(f"Error getting health: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

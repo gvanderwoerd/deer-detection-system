@@ -11,6 +11,13 @@ import functools
 from typing import Dict, List, Tuple
 from config import TUYA_CLOUD_API_KEY, TUYA_CLOUD_API_SECRET, TUYA_CLOUD_REGION
 
+# Import monitoring modules
+try:
+    from api_usage_tracker import get_tracker as get_api_tracker
+    HAS_API_TRACKER = True
+except ImportError:
+    HAS_API_TRACKER = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -148,6 +155,16 @@ class DeviceManager:
             'uptime_seconds': int(time.time() - self.startup_time)
         }
 
+    def _track_api_call(self, endpoint: str, start_time: float):
+        """Track API call latency with usage tracker"""
+        if HAS_API_TRACKER:
+            try:
+                latency_ms = (time.time() - start_time) * 1000
+                tracker = get_api_tracker()
+                tracker.track_call(endpoint, latency_ms)
+            except Exception as e:
+                logger.debug(f"Failed to track API call: {e}")
+
     def refresh_devices(self):
         """Discover all devices from SmartLife and refresh their status"""
         try:
@@ -280,14 +297,20 @@ class DeviceManager:
             device_name = self.devices.get(device_id, {}).get('name', device_id)
             logger.info(f"Turning ON device: {device_name}")
 
+            # Measure API latency
+            start_time = time.time()
+
             # Send command with retry
             result = self.cloud.sendcommand(
                 device_id,
                 {"commands": [{"code": "switch_1", "value": True}]}
             )
 
+            latency_ms = (time.time() - start_time) * 1000
+            self._track_api_call('sendcommand', start_time)
+
             if result.get('success'):
-                logger.info(f"  ✓ Command sent to {device_name}")
+                logger.info(f"  ✓ Command sent to {device_name} ({latency_ms:.0f}ms)")
 
                 # Update local status optimistically
                 if device_id in self.device_status:
@@ -315,17 +338,19 @@ class DeviceManager:
                     'verified': verified,
                     'device_id': device_id,
                     'device_name': device_name,
-                    'state': 'on'
+                    'state': 'on',
+                    'latency_ms': round(latency_ms, 2)
                 }
             else:
-                logger.error(f"  ✗ Failed: {result}")
+                logger.error(f"  ✗ Failed: {result} ({latency_ms:.0f}ms)")
                 return {
                     'success': False,
                     'verified': False,
                     'device_id': device_id,
                     'device_name': device_name,
                     'state': 'unknown',
-                    'error': str(result)
+                    'error': str(result),
+                    'latency_ms': round(latency_ms, 2)
                 }
 
         except Exception as e:
@@ -342,14 +367,20 @@ class DeviceManager:
             device_name = self.devices.get(device_id, {}).get('name', device_id)
             logger.info(f"Turning OFF device: {device_name}")
 
+            # Measure API latency
+            start_time = time.time()
+
             # Send command with retry
             result = self.cloud.sendcommand(
                 device_id,
                 {"commands": [{"code": "switch_1", "value": False}]}
             )
 
+            latency_ms = (time.time() - start_time) * 1000
+            self._track_api_call('sendcommand', start_time)
+
             if result.get('success'):
-                logger.info(f"  ✓ Command sent to {device_name}")
+                logger.info(f"  ✓ Command sent to {device_name} ({latency_ms:.0f}ms)")
 
                 # Update local status optimistically
                 if device_id in self.device_status:
@@ -373,17 +404,19 @@ class DeviceManager:
                     'verified': verified,
                     'device_id': device_id,
                     'device_name': device_name,
-                    'state': 'off'
+                    'state': 'off',
+                    'latency_ms': round(latency_ms, 2)
                 }
             else:
-                logger.error(f"  ✗ Failed: {result}")
+                logger.error(f"  ✗ Failed: {result} ({latency_ms:.0f}ms)")
                 return {
                     'success': False,
                     'verified': False,
                     'device_id': device_id,
                     'device_name': device_name,
                     'state': 'unknown',
-                    'error': str(result)
+                    'error': str(result),
+                    'latency_ms': round(latency_ms, 2)
                 }
 
         except Exception as e:
