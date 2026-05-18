@@ -2,12 +2,14 @@
 class CameraManager {
     constructor() {
         this.cameras = [];
+        this.devices = [];
         this.editingCameraId = null;
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.loadDevices();  // Load devices first
         this.loadCameras();
     }
 
@@ -51,6 +53,23 @@ class CameraManager {
             }
         } catch (error) {
             this.showError('Error loading cameras: ' + error.message);
+        }
+    }
+
+    async loadDevices() {
+        try {
+            const response = await fetch('/api/devices');
+            const data = await response.json();
+
+            if (data.success) {
+                this.devices = data.devices || [];
+            } else {
+                console.warn('Failed to load devices:', data.error);
+                this.devices = [];
+            }
+        } catch (error) {
+            console.warn('Error loading devices:', error.message);
+            this.devices = [];
         }
     }
 
@@ -259,8 +278,68 @@ class CameraManager {
         document.getElementById('editActiveDuration').value = camera.timing.active_window_seconds;
         document.getElementById('editCooldown').value = camera.timing.cooldown_period_seconds;
 
+        // Render device assignments
+        this.renderDeviceAssignments(camera);
+
         document.getElementById('editModalAlert').classList.remove('show');
         document.getElementById('editCameraModal').classList.add('show');
+    }
+
+    renderDeviceAssignments(camera) {
+        const container = document.getElementById('deviceAssignments');
+
+        if (this.devices.length === 0) {
+            container.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No smart devices available</p>';
+            return;
+        }
+
+        // Build a map of device_id -> duration for quick lookup
+        const assignedDevices = {};
+        camera.device_assignments.forEach(assignment => {
+            assignedDevices[assignment.device_id] = assignment.duration_seconds;
+        });
+
+        const html = this.devices.map(device => {
+            const isAssigned = device.id in assignedDevices;
+            const duration = assignedDevices[device.id] || 120;
+
+            return `
+                <div class="device-item">
+                    <input
+                        type="checkbox"
+                        class="device-checkbox"
+                        data-device-id="${device.id}"
+                        ${isAssigned ? 'checked' : ''}
+                    >
+                    <label>
+                        <div class="device-name">${this.escapeHtml(device.name)}</div>
+                        <div class="device-duration">
+                            Duration: <input
+                                type="number"
+                                class="device-duration-input"
+                                data-device-id="${device.id}"
+                                min="10"
+                                max="600"
+                                step="10"
+                                value="${duration}"
+                                ${!isAssigned ? 'disabled' : ''}
+                            /> seconds
+                        </div>
+                    </label>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+
+        // Add event listeners to checkboxes
+        document.querySelectorAll('.device-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const deviceId = e.target.dataset.deviceId;
+                const durationInput = document.querySelector(`.device-duration-input[data-device-id="${deviceId}"]`);
+                durationInput.disabled = !e.target.checked;
+            });
+        });
     }
 
     hideEditCameraModal() {
@@ -273,11 +352,24 @@ class CameraManager {
 
         const cameraId = document.getElementById('editCameraId').value;
 
-        // Collect enabled objects
+        // Collect enabled objects (those with name like "enabled_*")
         const enabledObjects = {};
-        document.querySelectorAll('#editCameraForm input[type="checkbox"]').forEach(checkbox => {
+        document.querySelectorAll('#editCameraForm input[type="checkbox"][name^="enabled_"]').forEach(checkbox => {
             const objectType = checkbox.name.replace('enabled_', '');
             enabledObjects[objectType] = checkbox.checked;
+        });
+
+        // Collect device assignments (those with class "device-checkbox")
+        const deviceAssignments = [];
+        document.querySelectorAll('.device-checkbox:checked').forEach(checkbox => {
+            const deviceId = checkbox.dataset.deviceId;
+            const durationInput = document.querySelector(`.device-duration-input[data-device-id="${deviceId}"]`);
+            const duration = parseInt(durationInput.value) || 120;
+
+            deviceAssignments.push({
+                device_id: deviceId,
+                duration_seconds: duration
+            });
         });
 
         const data = {
@@ -291,7 +383,8 @@ class CameraManager {
                 active_window_seconds: parseInt(document.getElementById('editActiveDuration').value),
                 cooldown_period_seconds: parseInt(document.getElementById('editCooldown').value),
                 max_detections_per_session: 3
-            }
+            },
+            device_assignments: deviceAssignments
         };
 
         try {
