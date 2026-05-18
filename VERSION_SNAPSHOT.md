@@ -1,6 +1,7 @@
 # Version Snapshot - Current State (2026-05-18)
 
-**Git Commit:** `a4e59fe` (feat: add WiFi signal strength indicator to dashboard)
+**Git Commit:** `6823936` (feat: add Claude model recommendation system)
+**Previous Commit:** `a4e59fe` (feat: add WiFi signal strength indicator to dashboard)
 **Branch:** main
 **Status:** ✅ Fully operational and stable
 
@@ -33,6 +34,11 @@
 ✅ WebSocket for efficient real-time communication
 ✅ Device manager for manual valve control
 ✅ Emergency stop functionality
+✅ Claude Model Recommendation System (NEW - 2026-05-18)
+  - Analyzes tasks and recommends appropriate Claude model
+  - Supports Haiku (fast), Sonnet (balanced), Opus (complex)
+  - API endpoint: POST /api/model-recommendation
+  - Keyword-based task categorization with confidence scoring
 
 ## Critical Firmware Notes
 
