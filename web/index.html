@@ -61,6 +61,40 @@
 
             <!-- Right Panel - Controls and Logs -->
             <div class="control-panel">
+                <!-- System Health Panel -->
+                <div class="health-panel" id="healthPanel" style="display: none;">
+                    <h2>System Health</h2>
+                    <div id="healthStatus" class="health-status">
+                        <div class="health-item">
+                            <span class="health-icon">✓</span>
+                            <span class="health-label">Credentials</span>
+                            <span id="healthCreds" class="health-value">Valid</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-icon">✓</span>
+                            <span class="health-label">API Quota</span>
+                            <span id="healthQuota" class="health-value">12% used</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-icon">✓</span>
+                            <span class="health-label">Success Rate</span>
+                            <span id="healthRate" class="health-value">95.2%</span>
+                        </div>
+                        <div class="health-item">
+                            <span class="health-icon">✓</span>
+                            <span class="health-label">Avg Latency</span>
+                            <span id="healthLatency" class="health-value">245ms</span>
+                        </div>
+                    </div>
+                    <button onclick="window.location.href='/diagnostics'" class="btn btn-primary btn-large">
+                        🔍 Full Diagnostics
+                    </button>
+                    <button onclick="window.location.href='/setup'" class="btn btn-secondary btn-large">
+                        ⚙️ Configure Setup
+                    </button>
+                    <hr>
+                </div>
+
                 <!-- System Controls -->
                 <div class="controls">
                     <h2>System Controls</h2>

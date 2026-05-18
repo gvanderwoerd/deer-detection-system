@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnostics - Deer Detection System</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .diagnostics-container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .diagnostic-header {
+            margin-bottom: 30px;
+        }
+
+        .diagnostic-header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .diagnostic-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .run-diagnostics-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: background-color 0.3s;
+        }
+
+        .run-diagnostics-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .run-diagnostics-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .diagnostic-results {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .results-summary {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .results-summary.healthy {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .results-summary.warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .results-summary.critical {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .test-result {
+            border-left: 4px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+
+        .test-result.pass {
+            border-left-color: #28a745;
+            background-color: #f0fdf4;
+        }
+
+        .test-result.warn {
+            border-left-color: #ffc107;
+            background-color: #fffbf0;
+        }
+
+        .test-result.fail {
+            border-left-color: #dc3545;
+            background-color: #fef5f5;
+        }
+
+        .test-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .test-message {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .test-icon {
+            float: right;
+            font-size: 24px;
+            margin-top: -5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .back-link {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 14px;
+            margin-top: 20px;
+            display: inline-block;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .api-stats {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .api-stats h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .api-stat-item {
+            display: inline-block;
+            margin-right: 30px;
+            margin-bottom: 10px;
+        }
+
+        .api-stat-value {
+            font-weight: bold;
+            color: #007bff;
+            font-size: 18px;
+        }
+
+        .api-stat-label {
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🔍 System Diagnostics</h1>
+    </header>
+
+    <div class="diagnostics-container">
+        <div class="diagnostic-header">
+            <h2>Run Comprehensive System Diagnostics</h2>
+            <p>Tests all system components to ensure everything is working correctly.</p>
+            <button class="run-diagnostics-btn" id="runButton" onclick="runDiagnostics()">Run Diagnostics</button>
+        </div>
+
+        <div id="resultsContainer" style="display: none;">
+            <div class="diagnostic-results">
+                <div id="resultsSummary"></div>
+                <div id="testResults"></div>
+                <div id="apiStats"></div>
+            </div>
+        </div>
+
+        <div id="loadingContainer" style="display: none;">
+            <div class="loading">
+                <div style="display: inline-block; width: 30px; height: 30px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <p>Running diagnostics...</p>
+            </div>
+        </div>
+
+        <a href="/" class="back-link">← Back to Dashboard</a>
+    </div>
+
+    <script>
+        async function runDiagnostics() {
+            const button = document.getElementById('runButton');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const loadingContainer = document.getElementById('loadingContainer');
+
+            button.disabled = true;
+            resultsContainer.style.display = 'none';
+            loadingContainer.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/diagnostics/run', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    displayDiagnostics(data.diagnostics);
+                } else {
+                    displayError(data.error || 'Unknown error');
+                }
+            } catch (error) {
+                displayError(`Network error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                loadingContainer.style.display = 'none';
+                resultsContainer.style.display = 'block';
+            }
+        }
+
+        function displayDiagnostics(diagnostics) {
+            const summary = document.getElementById('resultsSummary');
+            const results = document.getElementById('testResults');
+            const stats = document.getElementById('apiStats');
+
+            // Summary
+            const overallClass = diagnostics.overall === 'healthy' ? 'healthy' :
+                                diagnostics.overall === 'warning' ? 'warning' : 'critical';
+            summary.className = `results-summary ${overallClass}`;
+            summary.innerHTML = `<span>${getStatusIcon(diagnostics.overall)} ${diagnostics.summary}</span>`;
+
+            // Test results
+            results.innerHTML = '';
+            diagnostics.tests.forEach(test => {
+                const testDiv = document.createElement('div');
+                testDiv.className = `test-result ${test.status}`;
+                testDiv.innerHTML = `
+                    <div class="test-icon">${test.icon}</div>
+                    <div class="test-name">${test.name}</div>
+                    <div class="test-message">${test.message}</div>
+                `;
+                results.appendChild(testDiv);
+            });
+        }
+
+        function displayError(error) {
+            const results = document.getElementById('testResults');
+            results.innerHTML = `
+                <div class="test-result fail">
+                    <div class="test-icon">✗</div>
+                    <div class="test-name">Diagnostics Error</div>
+                    <div class="test-message">${error}</div>
+                </div>
+            `;
+        }
+
+        function getStatusIcon(status) {
+            switch(status) {
+                case 'healthy': return '✅';
+                case 'warning': return '⚠️';
+                case 'critical': return '🔴';
+                default: return '❓';
+            }
+        }
+    </script>
+</body>
+</html>

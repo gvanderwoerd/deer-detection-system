@@ -1042,6 +1042,129 @@ def api_health():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/diagnostics/run', methods=['POST'])
+def api_run_diagnostics():
+    """Run comprehensive system diagnostics"""
+    try:
+        dm = get_device_manager()
+        results = {
+            'timestamp': time.time(),
+            'tests': []
+        }
+
+        # Test 1: Credentials valid
+        cred_valid, cred_error = dm.credentials_valid, dm.last_error
+        results['tests'].append({
+            'name': 'API Credentials',
+            'status': 'pass' if cred_valid else 'fail',
+            'message': cred_error if not cred_valid else 'Credentials valid',
+            'icon': '✓' if cred_valid else '✗'
+        })
+
+        # Test 2: Device discovery
+        device_count = len(dm.devices)
+        results['tests'].append({
+            'name': f'Device Discovery',
+            'status': 'pass' if device_count > 0 else 'fail',
+            'message': f'Found {device_count} devices' if device_count > 0 else 'No devices found',
+            'icon': '✓' if device_count > 0 else '✗'
+        })
+
+        # Test 3: Primary valve reachability
+        from config import PRIMARY_VALVE_ID
+        if PRIMARY_VALVE_ID in dm.devices:
+            status = dm.get_device_status(PRIMARY_VALVE_ID, force_refresh=True)
+            is_online = status.get('online', False)
+            device_name = dm.devices[PRIMARY_VALVE_ID].get('name', 'Primary Valve')
+            results['tests'].append({
+                'name': f'Primary Valve ({device_name})',
+                'status': 'pass' if is_online else 'warn',
+                'message': f'Online' if is_online else 'Offline (WiFi may be disconnected)',
+                'icon': '✓' if is_online else '⚠'
+            })
+
+            # Test 4: Valve activation test
+            if is_online:
+                test_result = dm.turn_on(PRIMARY_VALVE_ID, duration=2)
+                activation_success = test_result.get('success', False) if isinstance(test_result, dict) else test_result
+                activation_verified = test_result.get('verified', False) if isinstance(test_result, dict) else False
+
+                results['tests'].append({
+                    'name': 'Valve Activation Test',
+                    'status': 'pass' if activation_verified else 'warn',
+                    'message': 'Activation verified' if activation_verified else 'Command sent but could not verify',
+                    'icon': '✓' if activation_verified else '⚠'
+                })
+        else:
+            results['tests'].append({
+                'name': 'Primary Valve',
+                'status': 'fail',
+                'message': f'PRIMARY_VALVE_ID not found in devices',
+                'icon': '✗'
+            })
+
+        # Test 5: API quota
+        tracker = get_api_tracker()
+        quota_stats = tracker.get_stats()
+        quota_usage = quota_stats['this_month']['quota_usage_pct']
+        quota_health = quota_stats['health_status']
+
+        results['tests'].append({
+            'name': 'API Quota',
+            'status': 'pass' if quota_health == 'healthy' else quota_health,
+            'message': f'{quota_usage:.1f}% of monthly quota used ({quota_stats["this_month"]["count"]} calls)',
+            'icon': '✓' if quota_health == 'healthy' else ('⚠' if quota_health == 'warning' else '✗')
+        })
+
+        # Overall result
+        failed = sum(1 for t in results['tests'] if t['status'] == 'fail')
+        warned = sum(1 for t in results['tests'] if t['status'] == 'warn')
+
+        results['overall'] = 'critical' if failed > 0 else ('warning' if warned > 0 else 'healthy')
+        results['summary'] = f'{len(results["tests"])} tests: {sum(1 for t in results["tests"] if t["status"] == "pass")} passed'
+
+        if failed > 0:
+            results['summary'] += f', {failed} failed'
+        if warned > 0:
+            results['summary'] += f', {warned} warnings'
+
+        return jsonify({
+            'success': True,
+            'diagnostics': results
+        })
+
+    except Exception as e:
+        logger.error(f"Error running diagnostics: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'diagnostics': {
+                'timestamp': time.time(),
+                'tests': [{
+                    'name': 'Diagnostics',
+                    'status': 'fail',
+                    'message': f'Error: {e}',
+                    'icon': '✗'
+                }],
+                'overall': 'critical'
+            }
+        }), 500
+
+
+@app.route('/setup', methods=['GET'])
+def setup_page():
+    """Serve setup configuration page"""
+    from flask import send_from_directory
+    return send_from_directory('../web', 'setup.html')
+
+
+@app.route('/diagnostics', methods=['GET'])
+def diagnostics_page():
+    """Serve diagnostics dashboard page"""
+    from flask import send_from_directory
+    return send_from_directory('../web', 'diagnostics.html')
+
+
 if __name__ == '__main__':
     logger.info(f"Starting server on {SERVER_HOST}:{SERVER_PORT}")
     logger.info(f"Web interface: http://192.168.1.15:{SERVER_PORT}")

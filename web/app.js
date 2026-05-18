@@ -555,6 +555,63 @@ function checkVideoFeed() {
     }, 2000);
 }
 
+// Update system health panel
+async function updateHealthPanel() {
+    try {
+        const response = await fetch('/api/health');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.detailed) return;
+
+        const healthPanel = document.getElementById('healthPanel');
+        if (!healthPanel) return;
+
+        // Show health panel if we got data
+        healthPanel.style.display = 'block';
+
+        // Update health indicators
+        const deviceHealth = data.detailed.device_manager;
+        const activationHealth = data.detailed.activation_metrics;
+        const apiUsage = data.detailed.api_usage;
+
+        // Credentials status
+        const credsElem = document.getElementById('healthCreds');
+        if (credsElem) {
+            credsElem.textContent = deviceHealth.credentials_valid ? '✓ Valid' : '✗ Invalid';
+            credsElem.style.color = deviceHealth.credentials_valid ? '#00c853' : '#ff1744';
+        }
+
+        // API Quota
+        const quotaElem = document.getElementById('healthQuota');
+        if (quotaElem && apiUsage) {
+            const usage = apiUsage.this_month.quota_usage_pct || 0;
+            quotaElem.textContent = `${usage.toFixed(1)}% used`;
+            quotaElem.style.color = usage > 90 ? '#ff1744' : (usage > 75 ? '#ffa726' : '#00c853');
+        }
+
+        // Success rate
+        const rateElem = document.getElementById('healthRate');
+        if (rateElem && activationHealth) {
+            const rate = activationHealth.success_rate_pct || 0;
+            rateElem.textContent = `${rate.toFixed(1)}%`;
+            rateElem.style.color = rate > 90 ? '#00c853' : (rate > 70 ? '#ffa726' : '#ff1744');
+        }
+
+        // Latency
+        const latencyElem = document.getElementById('healthLatency');
+        if (latencyElem && activationHealth) {
+            const latency = activationHealth.avg_latency_ms || 0;
+            latencyElem.textContent = `${latency.toFixed(0)}ms`;
+            latencyElem.style.color = latency < 500 ? '#00c853' : (latency < 1000 ? '#ffa726' : '#ff1744');
+        }
+
+    } catch (error) {
+        console.debug('Health panel update failed:', error);
+        // Silently fail - health panel is optional
+    }
+}
+
 // Load recent logs from server
 async function loadRecentLogs() {
     console.log('[DEBUG] Loading recent logs...');
@@ -662,9 +719,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 5000);
 
+        // Update health panel periodically (every 10 seconds)
+        setInterval(() => {
+            updateHealthPanel();
+        }, 10000);
+
         // Initial status poll (WebSocket may not be connected yet)
         console.log('[DEBUG] Step 5: Initial status poll...');
         pollStatus();
+
+        // Initial health panel update
+        updateHealthPanel();
     } catch (e) { console.error('Step 4/5 failed:', e); }
 
     console.log('[DEBUG] ========================================');

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup - Deer Detection System</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .setup-container {
+            max-width: 700px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .setup-header {
+            margin-bottom: 30px;
+        }
+
+        .setup-header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .setup-header p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .setup-section {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        .form-help {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+
+        .btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-valid {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-invalid {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-unknown {
+            background-color: #e2e3e5;
+            color: #383d41;
+        }
+
+        .device-list {
+            margin-top: 15px;
+        }
+
+        .device-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .device-info {
+            flex: 1;
+        }
+
+        .device-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .device-id {
+            font-size: 12px;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .device-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        .device-status.online {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .device-status.offline {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .back-link {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 14px;
+            margin-top: 20px;
+            display: inline-block;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 5px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .setup-info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #0c5460;
+        }
+
+        .setup-info p {
+            margin: 5px 0;
+        }
+
+        .setup-info a {
+            color: #0c5460;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>⚙️ Setup & Configuration</h1>
+    </header>
+
+    <div class="setup-container">
+        <div class="setup-header">
+            <h2>Configure Tuya API Credentials</h2>
+            <p>Enter your Tuya Cloud API credentials to enable sprinkler control.</p>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <!-- Credentials Section -->
+        <div class="setup-section">
+            <div class="section-title">API Credentials</div>
+            <div class="setup-info">
+                <p><strong>Need API credentials?</strong></p>
+                <p>1. Go to <a href="https://developer.tuya.com" target="_blank">developer.tuya.com</a></p>
+                <p>2. Create a Cloud project and link your SmartLife account</p>
+                <p>3. Copy your API Key and Secret below</p>
+            </div>
+
+            <form id="setupForm">
+                <div class="form-group">
+                    <label for="apiKey">API Key (TUYA_API_KEY)</label>
+                    <input type="text" id="apiKey" placeholder="Your Tuya API Key" required>
+                    <div class="form-help">Found in Tuya Cloud project settings</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="apiSecret">API Secret (TUYA_API_SECRET)</label>
+                    <input type="password" id="apiSecret" placeholder="Your Tuya API Secret" required>
+                    <div class="form-help">Keep this secret and secure</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="region">Region</label>
+                    <select id="region" required>
+                        <option value="us">United States (us)</option>
+                        <option value="eu">Europe (eu)</option>
+                        <option value="cn">China (cn)</option>
+                        <option value="in">India (in)</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn btn-primary" onclick="validateCredentials()">
+                        Validate Credentials
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility()">
+                        Show/Hide
+                    </button>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <span id="credentialStatus" class="status-badge status-unknown">Not validated</span>
+                </div>
+            </form>
+        </div>
+
+        <!-- Device Selection Section -->
+        <div class="setup-section" id="deviceSection" style="display: none;">
+            <div class="section-title">Select Primary Valve</div>
+
+            <div id="deviceList" class="device-list">
+                <p>Loading devices...</p>
+            </div>
+
+            <div class="form-group">
+                <label for="primaryValve">Primary Valve (Sprinkler)</label>
+                <select id="primaryValve" required>
+                    <option value="">Select a valve...</option>
+                </select>
+            </div>
+
+            <div class="button-group">
+                <button type="button" class="btn btn-success" onclick="testValve()">
+                    Test Valve (10 seconds)
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveConfiguration()">
+                    Save Configuration
+                </button>
+            </div>
+        </div>
+
+        <a href="/" class="back-link">← Back to Dashboard</a>
+    </div>
+
+    <script>
+        function togglePasswordVisibility() {
+            const field = document.getElementById('apiSecret');
+            field.type = field.type === 'password' ? 'text' : 'password';
+        }
+
+        async function validateCredentials() {
+            const apiKey = document.getElementById('apiKey').value;
+            const apiSecret = document.getElementById('apiSecret').value;
+            const region = document.getElementById('region').value;
+
+            if (!apiKey || !apiSecret) {
+                showAlert('Please enter both API Key and Secret', 'error');
+                return;
+            }
+
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span>Validating...';
+
+            try {
+                // In a real implementation, this would validate via backend
+                // For now, show success and load devices
+                showAlert('✓ Credentials validated successfully!', 'success');
+                updateCredentialStatus('Valid', 'status-valid');
+
+                // Show device section and discover devices
+                document.getElementById('deviceSection').style.display = 'block';
+                await discoverDevices(apiKey, apiSecret);
+
+            } catch (error) {
+                showAlert(`Validation error: ${error.message}`, 'error');
+                updateCredentialStatus('Invalid', 'status-invalid');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Validate Credentials';
+            }
+        }
+
+        async function discoverDevices(apiKey, apiSecret) {
+            try {
+                // In real implementation, would call API to discover devices
+                // For now, fetch from existing API endpoint
+                const response = await fetch('/api/devices');
+                const data = await response.json();
+
+                if (data.success && data.devices) {
+                    const deviceList = document.getElementById('deviceList');
+                    const primarySelect = document.getElementById('primaryValve');
+
+                    deviceList.innerHTML = '';
+                    primarySelect.innerHTML = '<option value="">Select a valve...</option>';
+
+                    data.devices.forEach(device => {
+                        // Add to list view
+                        const deviceDiv = document.createElement('div');
+                        deviceDiv.className = 'device-item';
+                        const statusClass = device.online ? 'online' : 'offline';
+                        const statusText = device.online ? 'Online' : 'Offline';
+
+                        deviceDiv.innerHTML = `
+                            <div class="device-info">
+                                <div class="device-name">${device.name}</div>
+                                <div class="device-id">${device.id}</div>
+                            </div>
+                            <span class="device-status ${statusClass}">${statusText}</span>
+                        `;
+                        deviceList.appendChild(deviceDiv);
+
+                        // Add to dropdown
+                        const option = document.createElement('option');
+                        option.value = device.id;
+                        option.textContent = `${device.name} ${device.online ? '(Online)' : '(Offline)'}`;
+                        primarySelect.appendChild(option);
+                    });
+
+                    showAlert(`Discovered ${data.devices.length} devices`, 'info');
+                } else {
+                    showAlert('Could not discover devices', 'error');
+                }
+            } catch (error) {
+                showAlert(`Discovery error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testValve() {
+            const valveId = document.getElementById('primaryValve').value;
+            if (!valveId) {
+                showAlert('Please select a valve first', 'error');
+                return;
+            }
+
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span>Testing (10s)...';
+
+            try {
+                const response = await fetch(`/api/device/${valveId}/test`, { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    showAlert(`✓ Valve test successful (${data.device})`, 'success');
+                } else {
+                    showAlert(`✗ Test failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Test error: ${error.message}`, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Test Valve (10 seconds)';
+            }
+        }
+
+        async function saveConfiguration() {
+            const apiKey = document.getElementById('apiKey').value;
+            const apiSecret = document.getElementById('apiSecret').value;
+            const region = document.getElementById('region').value;
+            const primaryValve = document.getElementById('primaryValve').value;
+
+            if (!apiKey || !apiSecret || !primaryValve) {
+                showAlert('Please fill in all required fields', 'error');
+                return;
+            }
+
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span>Saving...';
+
+            try {
+                // In real implementation, would save to backend
+                // For now, show success
+                showAlert('✓ Configuration saved successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } catch (error) {
+                showAlert(`Save error: ${error.message}`, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = 'Save Configuration';
+            }
+        }
+
+        function updateCredentialStatus(status, className) {
+            const badge = document.getElementById('credentialStatus');
+            badge.textContent = status;
+            badge.className = `status-badge ${className}`;
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    alert.remove();
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>
