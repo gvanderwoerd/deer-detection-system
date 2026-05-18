@@ -399,11 +399,17 @@ class DeerDetectionSystem:
         animal_type = detections[0]['class']
         class_id = detections[0].get('class_id')
 
+        # Determine camera (use first camera for now, will be enhanced for multi-camera)
+        cameras = self.camera_manager.get_all_cameras()
+        camera_id = cameras[0]['id'] if cameras else 'camera-default'
+
+        saved_filename = None
+
         # Save to gallery if in save list (deer, cow, sheep, person)
         if class_id in SAVE_CLASS_IDS:
             storage = get_detection_storage()
-            saved_filename = storage.save_detection(annotated_frame, detections, animal_type)
-            logger.info(f"📸 Detection image saved: {saved_filename} ({animal_type})")
+            saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
+            logger.info(f"📸 Detection image saved: {camera_id}/{saved_filename} ({animal_type})")
         else:
             logger.info(f"ℹ️ Detection not saved: {animal_type} (class {class_id}) - not in save list")
 
@@ -431,7 +437,8 @@ class DeerDetectionSystem:
             'animal': animal_type,
             'detections': len(detections),
             'session_count': self.session_detections,
-            'image': saved_filename
+            'image': saved_filename,
+            'camera': camera_id
         })
 
         self.change_state(SystemState.DEER_DETECTED)
@@ -878,22 +885,24 @@ def detections_page():
 
 @app.route('/api/detections', methods=['GET'])
 def api_get_detections():
-    """Get list of detection records"""
+    """Get list of detection records (supports per-camera and legacy)"""
     try:
         storage = get_detection_storage()
 
         # Get pagination parameters
         limit = request.args.get('limit', type=int, default=50)
         offset = request.args.get('offset', type=int, default=0)
+        camera_id = request.args.get('camera_id', default=None)  # Optional: specific camera
 
-        # Get detections
-        detections = storage.get_detections(limit=limit, offset=offset)
-        stats = storage.get_detection_stats()
+        # Get detections (camera_id=None returns legacy detections)
+        detections = storage.get_detections(camera_id=camera_id, limit=limit, offset=offset)
+        stats = storage.get_detection_stats(camera_id=camera_id)
 
         return jsonify({
             'success': True,
             'detections': detections,
             'stats': stats,
+            'camera_id': camera_id,
             'limit': limit,
             'offset': offset
         })
@@ -902,13 +911,31 @@ def api_get_detections():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/api/detections/<filename>')
-def api_get_detection_image(filename):
-    """Serve a detection image"""
+@app.route('/api/detections/<camera_id>/<filename>')
+def api_get_detection_image_per_camera(camera_id, filename):
+    """Serve a per-camera detection image"""
     try:
         from flask import send_from_directory
         storage = get_detection_storage()
-        image_path = storage.get_detection_image_path(filename)
+        image_path = storage.get_detection_image_path(camera_id=camera_id, filename=filename)
+
+        if image_path.exists():
+            detections_dir = str(image_path.parent)
+            return send_from_directory(detections_dir, filename)
+        else:
+            return jsonify({'error': 'Image not found'}), 404
+    except Exception as e:
+        logger.error(f"Error serving image {camera_id}/{filename}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/detections/<filename>')
+def api_get_detection_image(filename):
+    """Serve a detection image (legacy endpoint for backward compatibility)"""
+    try:
+        from flask import send_from_directory
+        storage = get_detection_storage()
+        image_path = storage.get_detection_image_path(camera_id=None, filename=filename)
 
         if image_path.exists():
             detections_dir = str(image_path.parent)
@@ -922,10 +949,11 @@ def api_get_detection_image(filename):
 
 @app.route('/api/detections/delete', methods=['POST'])
 def api_delete_detections():
-    """Delete detections based on age filter"""
+    """Delete detections based on age filter (supports per-camera and legacy)"""
     try:
         data = request.json
         age_filter = data.get('filter', 'all')
+        camera_id = data.get('camera_id', None)  # Optional: specific camera
 
         # Validate filter
         valid_filters = ['all', 'year', 'month', 'week', 'day', 'hour', '10min']
@@ -936,12 +964,13 @@ def api_delete_detections():
             }), 400
 
         storage = get_detection_storage()
-        deleted_count = storage.delete_detections_by_age(age_filter)
+        deleted_count = storage.delete_detections_by_age(age_filter, camera_id=camera_id)
 
         return jsonify({
             'success': True,
             'deleted': deleted_count,
-            'message': f'Deleted {deleted_count} detection(s) (filter: {age_filter})'
+            'message': f'Deleted {deleted_count} detection(s) (filter: {age_filter})',
+            'camera_id': camera_id
         })
     except Exception as e:
         logger.error(f"Error deleting detections: {e}")
@@ -950,11 +979,12 @@ def api_delete_detections():
 
 @app.route('/api/detections/stats', methods=['GET'])
 def api_detection_stats():
-    """Get detection statistics"""
+    """Get detection statistics (supports per-camera and legacy)"""
     try:
         storage = get_detection_storage()
-        stats = storage.get_detection_stats()
-        return jsonify({'success': True, 'stats': stats})
+        camera_id = request.args.get('camera_id', default=None)  # Optional: specific camera
+        stats = storage.get_detection_stats(camera_id=camera_id)
+        return jsonify({'success': True, 'stats': stats, 'camera_id': camera_id})
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
