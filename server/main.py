@@ -581,6 +581,12 @@ def devices_page():
     return app.send_static_file('devices.html')
 
 
+@app.route('/cameras')
+def cameras_page():
+    """Serve the camera management page"""
+    return app.send_static_file('cameras.html')
+
+
 @app.route('/api/status')
 def api_status():
     """Get system status"""
