@@ -73,6 +73,13 @@ class ActivationMetrics:
                 'total_successful': 0,
                 'total_failed': 0,
                 'success_rate_pct': 0.0,
+                'verification_rate_pct': 0.0,
+                'latency': {
+                    'avg_ms': 0.0,
+                    'min_ms': 0.0,
+                    'max_ms': 0.0
+                },
+                'failure_reasons': {},
                 'recent_activations': [],
                 'uptime_seconds': int(time.time() - self.startup_time)
             }
