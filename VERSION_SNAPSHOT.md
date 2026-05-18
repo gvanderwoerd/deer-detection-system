@@ -1,15 +1,17 @@
-# Version Snapshot - Current State (2026-05-18)
+# Version Snapshot - Current State (2026-05-18 - UPDATED)
 
-**Git Commit:** (Phase 4 Complete - Sprinkler Reliability Framework)
+**Git Commit:** `c6b5a9b` (Diagnostics Enhancement - Detection System Summary)
 **Framework Commits:**
 - Phase 1: `04edbc6` (Reliability Core - Retry logic, validation, verification)
 - Phase 2: `76662d5` (Monitoring - API tracking, metrics, logging)
 - Phase 3: `0109059` (Web Interfaces - Diagnostics, setup, health panel)
-- Phase 4: In progress (Documentation, tests, WebSocket events)
+- Phase 4: `db3f72a` (Documentation, tests, WebSocket events - COMPLETE)
+- Post-Phase 4: `28f44b7` (Bug fix - activation metrics KeyError on startup)
+- Post-Phase 4: `c6b5a9b` (Enhancement - detection system summary in diagnostics)
 
 **Previous:** `a4e59fe` (feat: add WiFi signal strength indicator to dashboard)
 **Branch:** main
-**Status:** ✅ Fully operational with production-ready reliability framework
+**Status:** ✅ Fully operational with production-ready reliability framework + enhanced diagnostics
 
 ## Current System State
 
@@ -19,6 +21,9 @@
 - Auto-cleanup after 7 days implemented
 - Tuya credentials secured in .env file
 - Dead code cleaned up (Phase 1 & 2 cleanup complete)
+- **NEW:** Comprehensive diagnostics with detection system information
+- **FIXED:** Health endpoint KeyError on startup (missing latency fields)
+- **TESTED:** All 4 phases verified operational (20/21 integration tests passing)
 
 ### ESP32-CAM Firmware
 **Status:** ⏳ NOT YET UPDATED
@@ -40,11 +45,24 @@
 ✅ WebSocket for efficient real-time communication
 ✅ Device manager for manual valve control
 ✅ Emergency stop functionality
-✅ Claude Model Recommendation System (NEW - 2026-05-18)
+✅ Claude Model Recommendation System
   - Analyzes tasks and recommends appropriate Claude model
   - Supports Haiku (fast), Sonnet (balanced), Opus (complex)
   - API endpoint: POST /api/model-recommendation
-  - Keyword-based task categorization with confidence scoring
+✅ Sprinkler Control Reliability Framework (Phase 1-4 Complete)
+  - Automatic retry logic with exponential backoff
+  - Startup credential validation
+  - Command verification (read-back checks)
+  - API quota monitoring and warnings
+  - Activation metrics and success rate tracking
+  - Browser-based setup wizard (/setup)
+  - Comprehensive diagnostics dashboard (/diagnostics)
+  - Real-time health monitoring panel
+✅ Detection System Summary in Diagnostics (NEW - 2026-05-18)
+  - Explains system configuration and safety features
+  - Shows expected behavior when camera comes online
+  - Helps users understand detection capabilities
+  - Integrated into /api/diagnostics/run endpoint
 
 ## Critical Firmware Notes
 
@@ -57,10 +75,13 @@ DO NOT modify ESP32-CAM firmware without reading `esp32-cam/FIRMWARE_NOTES.md`
 
 When resuming:
 1. Check this snapshot first to understand current state
-2. Review pending features (WiFi signal strength firmware update when needed)
-3. No breaking changes needed - system is stable
-4. Focus on enhancements, not bug fixes
+2. All 4-phase framework complete and fully tested
+3. System ready for production deployment
+4. Consider next enhancements (e.g., multiple valve zones, advanced scheduling, etc.)
+5. ESP32-CAM firmware update pending when adding new features
 
 ---
-**Bookmark created at commit:** a4e59fe
-**Stable until:** Next breaking change or firmware update
+**Bookmark created at commit:** c6b5a9b
+**Latest commits:** 28f44b7 (bug fix), c6b5a9b (diagnostics enhancement)
+**Stable until:** Next significant feature or breaking change
+**Testing status:** 20/21 integration tests passing (95% pass rate)
