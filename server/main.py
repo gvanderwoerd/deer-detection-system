@@ -457,7 +457,19 @@ class DeerDetectionSystem:
         self.change_state(SystemState.SPRINKLER_ON)
 
         # Turn on valve
-        if self.valve.turn_on(duration=SPRINKLER_DURATION_SECONDS):
+        result = self.valve.turn_on(duration=SPRINKLER_DURATION_SECONDS)
+
+        # Handle both dict return (new) and bool return (legacy)
+        success = result.get('success') if isinstance(result, dict) else result
+        verified = result.get('verified', False) if isinstance(result, dict) else False
+
+        if success:
+            # Log verification status
+            if verified:
+                self.log_event('sprinkler', f"✓ Sprinkler activated and verified")
+            else:
+                self.log_event('sprinkler', f"⚠ Sprinkler command sent but could not verify")
+
             # Wait for sprinkler to finish
             time.sleep(SPRINKLER_DURATION_SECONDS + 1)
 
@@ -471,7 +483,8 @@ class DeerDetectionSystem:
             if self.state == SystemState.COOLDOWN:
                 self.change_state(SystemState.ACTIVE)
         else:
-            self.log_event('error', "Failed to activate sprinkler")
+            error_msg = result.get('error', 'Unknown error') if isinstance(result, dict) else 'Failed to activate sprinkler'
+            self.log_event('error', f"Failed to activate sprinkler: {error_msg}")
             self.change_state(SystemState.ACTIVE)
 
     def enable_system(self):
@@ -615,10 +628,25 @@ def api_sprinkler_on():
     duration = request.json.get('duration', 10) if request.json else 10
     system.log_event('manual', f"Manual sprinkler activation ({duration}s)")
 
-    if system.valve.turn_on(duration=duration):
-        return jsonify({'success': True, 'message': f'Sprinkler on for {duration}s'})
+    result = system.valve.turn_on(duration=duration)
+
+    # Handle both dict return (new) and bool return (legacy)
+    success = result.get('success') if isinstance(result, dict) else result
+    verified = result.get('verified', False) if isinstance(result, dict) else False
+
+    if success:
+        return jsonify({
+            'success': True,
+            'message': f'Sprinkler on for {duration}s',
+            'verified': verified,
+            'device': result.get('device_name') if isinstance(result, dict) else 'Unknown'
+        })
     else:
-        return jsonify({'success': False, 'message': 'Failed to activate sprinkler'})
+        error_msg = result.get('error', 'Unknown error') if isinstance(result, dict) else 'Failed to activate sprinkler'
+        return jsonify({
+            'success': False,
+            'message': f'Failed to activate sprinkler: {error_msg}'
+        })
 
 
 @app.route('/api/sprinkler/off', methods=['POST'])
@@ -724,14 +752,22 @@ def turn_device_on(device_id):
     try:
         duration = request.json.get('duration', 0) if request.is_json else 0
         dm = get_device_manager()
-        success = dm.turn_on(device_id, duration=duration)
-        
+        result = dm.turn_on(device_id, duration=duration)
+
+        # Handle both dict return (new) and bool return (legacy)
+        success = result.get('success') if isinstance(result, dict) else result
+
         socketio.emit('device_update', {
             'device_id': device_id,
-            'action': 'turned_on'
+            'action': 'turned_on',
+            'verified': result.get('verified', False) if isinstance(result, dict) else False
         })
-        
-        return jsonify({'success': success})
+
+        return jsonify({
+            'success': success,
+            'verified': result.get('verified', False) if isinstance(result, dict) else False,
+            'device': result.get('device_name') if isinstance(result, dict) else 'Unknown'
+        })
     except Exception as e:
         logger.error(f"Error turning on device {device_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -741,14 +777,22 @@ def turn_device_off(device_id):
     """Turn specific device OFF"""
     try:
         dm = get_device_manager()
-        success = dm.turn_off(device_id)
-        
+        result = dm.turn_off(device_id)
+
+        # Handle both dict return (new) and bool return (legacy)
+        success = result.get('success') if isinstance(result, dict) else result
+
         socketio.emit('device_update', {
             'device_id': device_id,
-            'action': 'turned_off'
+            'action': 'turned_off',
+            'verified': result.get('verified', False) if isinstance(result, dict) else False
         })
-        
-        return jsonify({'success': success})
+
+        return jsonify({
+            'success': success,
+            'verified': result.get('verified', False) if isinstance(result, dict) else False,
+            'device': result.get('device_name') if isinstance(result, dict) else 'Unknown'
+        })
     except Exception as e:
         logger.error(f"Error turning off device {device_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -758,14 +802,20 @@ def test_device(device_id):
     """Test device with 10-second run"""
     try:
         dm = get_device_manager()
-        success = dm.test_device(device_id, duration=10)
-        
+        result = dm.test_device(device_id, duration=10)
+        success = result.get('success') if isinstance(result, dict) else result
+
         socketio.emit('log_event', {
             'message': f'Testing device (10 seconds)',
-            'device_id': device_id
+            'device_id': device_id,
+            'verified': result.get('verified', False) if isinstance(result, dict) else False
         })
-        
-        return jsonify({'success': success})
+
+        return jsonify({
+            'success': success,
+            'verified': result.get('verified', False) if isinstance(result, dict) else False,
+            'device': result.get('device_name') if isinstance(result, dict) else 'Unknown'
+        })
     except Exception as e:
         logger.error(f"Error testing device {device_id}: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

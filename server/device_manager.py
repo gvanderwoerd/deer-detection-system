@@ -7,10 +7,61 @@ import tinytuya
 import logging
 import threading
 import time
-from typing import Dict, List
+import functools
+from typing import Dict, List, Tuple
 from config import TUYA_CLOUD_API_KEY, TUYA_CLOUD_API_SECRET, TUYA_CLOUD_REGION
 
 logger = logging.getLogger(__name__)
+
+
+# Retry configuration
+RETRY_CONFIG = {
+    'max_retries': 3,
+    'base_delay': 1.0,  # Start with 1 second
+    'max_delay': 16.0   # Cap at 16 seconds
+}
+
+
+def retry_with_backoff(max_retries=3, base_delay=1.0):
+    """
+    Decorator for retrying API calls with exponential backoff.
+    Distinguishes between transient (retry) and permanent (fail fast) errors.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = base_delay
+            last_exception = None
+
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    error_str = str(e).lower()
+
+                    # Permanent errors - fail fast
+                    if any(x in error_str for x in ['invalid', 'unauthorized', 'forbidden', 'not found']):
+                        logger.error(f"{func.__name__} failed with permanent error: {e}")
+                        raise
+
+                    # Quota errors - fail fast
+                    if any(x in error_str for x in ['quota', 'trial', '28841004']):
+                        logger.error(f"{func.__name__} failed: API quota exceeded")
+                        raise
+
+                    # Transient errors - retry
+                    if attempt < max_retries:
+                        logger.warning(f"{func.__name__} attempt {attempt + 1}/{max_retries + 1} failed: {e}. Retrying in {delay}s...")
+                        time.sleep(delay)
+                        delay = min(delay * 2, 16.0)  # Exponential backoff, capped at 16s
+                    else:
+                        logger.error(f"{func.__name__} failed after {max_retries + 1} attempts: {e}")
+                        raise
+
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 class DeviceManager:
@@ -28,9 +79,74 @@ class DeviceManager:
         self.monitor_thread = None
         self.stop_monitoring = False
         self.last_error = None
+        self.credentials_valid = False
+        self.startup_time = time.time()
 
-        # Initial device discovery
-        self.refresh_devices()
+        # Validate credentials at startup
+        self.validate_credentials()
+
+        # Initial device discovery (only if credentials valid)
+        if self.credentials_valid:
+            self.refresh_devices()
+        else:
+            logger.error("Device manager initialized with invalid credentials. Please check setup.")
+
+    def validate_credentials(self) -> Tuple[bool, str]:
+        """
+        Validate Tuya API credentials by making a test API call.
+        Returns (valid: bool, error_message: str)
+        """
+        try:
+            if not TUYA_CLOUD_API_KEY or not TUYA_CLOUD_API_SECRET:
+                error_msg = "Missing API credentials in .env file (TUYA_API_KEY and/or TUYA_API_SECRET)"
+                logger.error(f"Credential validation failed: {error_msg}")
+                self.credentials_valid = False
+                self.last_error = error_msg
+                return False, error_msg
+
+            # Test API connection with a lightweight call
+            logger.info("Validating Tuya API credentials...")
+            result = self.cloud.getdevices()
+
+            if isinstance(result, list):
+                logger.info("✓ API credentials valid")
+                self.credentials_valid = True
+                self.last_error = None
+                return True, ""
+            else:
+                error_msg = f"API credentials invalid or account has no devices: {result}"
+                logger.error(f"Credential validation failed: {error_msg}")
+                self.credentials_valid = False
+                self.last_error = error_msg
+                return False, error_msg
+
+        except Exception as e:
+            error_str = str(e).lower()
+            if "quota" in error_str or "trial" in error_str or "28841004" in error_str:
+                error_msg = "Cloud API Quota Exceeded - check your Tuya subscription or trial status"
+            elif "unauthorized" in error_str or "invalid" in error_str:
+                error_msg = "Invalid API credentials - check .env file (TUYA_API_KEY and TUYA_API_SECRET)"
+            else:
+                error_msg = f"Network error validating credentials: {e}"
+
+            logger.error(f"Credential validation failed: {error_msg}")
+            self.credentials_valid = False
+            self.last_error = error_msg
+            return False, error_msg
+
+    def is_healthy(self) -> Dict:
+        """
+        Get system health status for monitoring.
+        Returns dict with health indicators.
+        """
+        return {
+            'credentials_valid': self.credentials_valid,
+            'devices_discovered': len(self.devices) > 0,
+            'devices_count': len(self.devices),
+            'devices_online': sum(1 for d in self.devices.values() if d.get('online', False)),
+            'last_error': self.last_error,
+            'uptime_seconds': int(time.time() - self.startup_time)
+        }
 
     def refresh_devices(self):
         """Discover all devices from SmartLife and refresh their status"""
@@ -154,73 +270,142 @@ class DeviceManager:
 
             return status
 
-    def turn_on(self, device_id: str, duration: int = 0) -> bool:
-        """Turn device ON"""
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    def turn_on(self, device_id: str, duration: int = 0) -> Dict:
+        """
+        Turn device ON with retry logic and verification.
+        Returns dict with success, verified, and state info.
+        """
         try:
-            logger.info(f"Turning ON device: {self.devices[device_id]['name']}")
+            device_name = self.devices.get(device_id, {}).get('name', device_id)
+            logger.info(f"Turning ON device: {device_name}")
 
+            # Send command with retry
             result = self.cloud.sendcommand(
                 device_id,
                 {"commands": [{"code": "switch_1", "value": True}]}
             )
 
             if result.get('success'):
-                logger.info(f"  ✓ Device turned ON")
+                logger.info(f"  ✓ Command sent to {device_name}")
 
-                # Update local status
+                # Update local status optimistically
                 if device_id in self.device_status:
                     self.device_status[device_id]['is_on'] = True
+
+                # Verify command by reading back state (with small delay for device to respond)
+                verified = False
+                time.sleep(0.5)  # Give device time to respond
+                try:
+                    status = self.get_device_status(device_id, force_refresh=True)
+                    if status.get('is_on'):
+                        verified = True
+                        logger.info(f"  ✓ Verified: {device_name} is ON")
+                    else:
+                        logger.warning(f"  ⚠ Verification failed: {device_name} reports OFF after command")
+                except Exception as e:
+                    logger.warning(f"  ⚠ Could not verify state: {e}")
 
                 # Auto-off timer
                 if duration > 0:
                     threading.Timer(duration, lambda: self.turn_off(device_id)).start()
 
-                return True
+                return {
+                    'success': True,
+                    'verified': verified,
+                    'device_id': device_id,
+                    'device_name': device_name,
+                    'state': 'on'
+                }
             else:
                 logger.error(f"  ✗ Failed: {result}")
-                return False
+                return {
+                    'success': False,
+                    'verified': False,
+                    'device_id': device_id,
+                    'device_name': device_name,
+                    'state': 'unknown',
+                    'error': str(result)
+                }
 
         except Exception as e:
             logger.error(f"Error turning on {device_id}: {e}")
-            return False
+            raise
 
-    def turn_off(self, device_id: str) -> bool:
-        """Turn device OFF"""
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    def turn_off(self, device_id: str) -> Dict:
+        """
+        Turn device OFF with retry logic and verification.
+        Returns dict with success, verified, and state info.
+        """
         try:
-            logger.info(f"Turning OFF device: {self.devices[device_id]['name']}")
+            device_name = self.devices.get(device_id, {}).get('name', device_id)
+            logger.info(f"Turning OFF device: {device_name}")
 
+            # Send command with retry
             result = self.cloud.sendcommand(
                 device_id,
                 {"commands": [{"code": "switch_1", "value": False}]}
             )
 
             if result.get('success'):
-                logger.info(f"  ✓ Device turned OFF")
+                logger.info(f"  ✓ Command sent to {device_name}")
 
-                # Update local status
+                # Update local status optimistically
                 if device_id in self.device_status:
                     self.device_status[device_id]['is_on'] = False
 
-                return True
+                # Verify command by reading back state (with small delay for device to respond)
+                verified = False
+                time.sleep(0.5)  # Give device time to respond
+                try:
+                    status = self.get_device_status(device_id, force_refresh=True)
+                    if not status.get('is_on'):
+                        verified = True
+                        logger.info(f"  ✓ Verified: {device_name} is OFF")
+                    else:
+                        logger.warning(f"  ⚠ Verification failed: {device_name} reports ON after command")
+                except Exception as e:
+                    logger.warning(f"  ⚠ Could not verify state: {e}")
+
+                return {
+                    'success': True,
+                    'verified': verified,
+                    'device_id': device_id,
+                    'device_name': device_name,
+                    'state': 'off'
+                }
             else:
                 logger.error(f"  ✗ Failed: {result}")
-                return False
+                return {
+                    'success': False,
+                    'verified': False,
+                    'device_id': device_id,
+                    'device_name': device_name,
+                    'state': 'unknown',
+                    'error': str(result)
+                }
 
         except Exception as e:
             logger.error(f"Error turning off {device_id}: {e}")
-            return False
+            raise
 
-    def test_device(self, device_id: str, duration: int = 10) -> bool:
+    def test_device(self, device_id: str, duration: int = 10) -> Dict:
         """Test device with auto-off"""
         return self.turn_on(device_id, duration=duration)
 
-    def emergency_stop_all(self) -> Dict[str, bool]:
+    def emergency_stop_all(self) -> Dict:
         """Turn off ALL devices immediately"""
         logger.warning("EMERGENCY STOP - Turning off all devices")
 
         results = {}
         for device_id in self.devices.keys():
-            results[device_id] = self.turn_off(device_id)
+            try:
+                result = self.turn_off(device_id)
+                results[device_id] = result.get('success', False)
+            except Exception as e:
+                logger.error(f"Emergency stop failed for {device_id}: {e}")
+                results[device_id] = False
 
         return results
 
