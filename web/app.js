@@ -663,6 +663,81 @@ async function loadRecentLogs() {
 }
 
 // Initialize on page load
+// --- MULTI-CAMERA GRID ---
+let camerasData = {};
+
+async function initCameraGrid() {
+    try {
+        const response = await fetch('/api/cameras');
+        const data = await response.json();
+
+        if (data.success) {
+            camerasData = {};
+            data.cameras.forEach(camera => {
+                camerasData[camera.id] = camera;
+            });
+            renderCameraGrid();
+            console.log('[DEBUG] Camera grid initialized with', Object.keys(camerasData).length, 'cameras');
+        }
+    } catch (error) {
+        console.error('Failed to load cameras:', error);
+    }
+}
+
+function renderCameraGrid() {
+    const grid = document.getElementById('camerasGrid');
+    if (!grid) return;
+
+    if (Object.keys(camerasData).length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; color: #999;">No cameras configured</div>';
+        return;
+    }
+
+    grid.innerHTML = Object.values(camerasData).map(camera => createCameraCard(camera)).join('');
+}
+
+function createCameraCard(camera) {
+    const isOnline = camera.state.online;
+    const statusClass = isOnline ? 'online' : 'offline';
+    const statusText = isOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
+
+    const videoUrl = `/video_feed/${camera.id}`;
+    const offlinePlaceholder = isOnline ? '' : `<div class="offline-placeholder"><p>📷 ${camera.name} Offline</p></div>`;
+
+    return `
+        <div class="camera-grid-card">
+            <div class="camera-grid-header">
+                <div class="camera-grid-name">${escapeHtml(camera.name)}</div>
+                <div class="camera-grid-status ${statusClass}">${statusText}</div>
+            </div>
+            <div class="camera-grid-video">
+                <img src="${videoUrl}" alt="${camera.name}" style="display: ${isOnline ? 'block' : 'none'};">
+                ${offlinePlaceholder}
+            </div>
+            <div class="camera-grid-info">
+                <span>Session: ${camera.state.session_detections || 0}</span>
+                <span>Enabled: ${camera.enabled ? '✓' : '✗'}</span>
+            </div>
+            <button class="camera-grid-action" onclick="window.location.href='/cameras#${camera.id}'">⚙️ Edit</button>
+        </div>
+    `;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Update camera status from WebSocket
+function updateCameraStatus(cameraId, statusData) {
+    if (camerasData[cameraId]) {
+        Object.assign(camerasData[cameraId].state, statusData);
+        renderCameraGrid();
+    }
+}
+// ------------------------
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('[DEBUG] ========================================');
     console.log('[DEBUG] Deer Detection System UI initializing...');
@@ -737,6 +812,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initial health panel update
         updateHealthPanel();
     } catch (e) { console.error('Step 4/5 failed:', e); }
+
+    // Initialize multi-camera grid
+    try {
+        console.log('[DEBUG] Step 6: Initializing camera grid...');
+        initCameraGrid();
+    } catch (e) { console.error('Step 6 failed:', e); }
 
     console.log('[DEBUG] ========================================');
     console.log('[DEBUG] Initialization complete!');

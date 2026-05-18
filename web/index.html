@@ -37,24 +37,11 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Left Panel - Video Feed -->
-            <div class="video-panel">
-                <div class="video-container">
-                    <img id="video-feed" src="/video_feed" alt="Camera Feed">
-                    <div id="no-feed-message" class="no-feed">
-                        <p>📷 Waiting for camera...</p>
-                        <p class="small">ESP32-CAM will activate on motion detection</p>
-                    </div>
-                </div>
-
-                <div class="detection-info">
-                    <div class="info-item">
-                        <span>Session Detections:</span>
-                        <span id="session-detections">0</span>
-                    </div>
-                    <div class="info-item">
-                        <span>Cooldown:</span>
-                        <span id="cooldown-status">None</span>
+            <!-- Left Panel - Multi-Camera Grid -->
+            <div id="cameras-container">
+                <div class="cameras-grid" id="camerasGrid">
+                    <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; color: #999;">
+                        <p>Loading cameras...</p>
                     </div>
                 </div>
             </div>
