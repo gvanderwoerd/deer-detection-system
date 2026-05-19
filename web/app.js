@@ -78,6 +78,7 @@ let availableCameras = [];  // List of available cameras
 let cameraStatusInterval = null;  // Interval for polling camera status
 let cameraStatusData = {};  // Store status data for each camera
 let cameraCountdownIntervals = {};  // Store countdown intervals for each camera
+let cameraDeviceDurations = {};  // Track device duration countdown for each camera
 
 // Camera control functions
 async function startCamera() {
@@ -638,8 +639,17 @@ function updateCameraFooter(cameraId, statusData) {
         const elapsed = Math.floor(statusData.session_elapsed_seconds || 0);
         const remaining = Math.floor(Math.max(0, (statusData.active_window_seconds || 60) - elapsed));
         const detections = statusData.session_detections || 0;
-        const durations = statusData.device_durations || [];
-        const durationText = durations.length > 0 ? `Duration: ${durations.join('s, ')}s` : 'Duration: Not configured';
+
+        // Initialize device duration countdown if not already started
+        if (!cameraDeviceDurations[cameraId]) {
+            const durations = statusData.device_durations || [];
+            cameraDeviceDurations[cameraId] = durations.length > 0 ? durations[0] : 0;
+        }
+
+        const durationRemaining = Math.max(0, cameraDeviceDurations[cameraId] - elapsed);
+        const durationText = cameraDeviceDurations[cameraId] > 0
+            ? `Duration: ${Math.floor(durationRemaining)}s`
+            : 'Duration: Not configured';
 
         footerHtml = `
             <div class="footer-status active">
@@ -707,10 +717,15 @@ function startCountdownTimer(cameraId) {
                 // Session ended, will fetch new status next poll
                 statusData.session_active = false;
                 statusData.cooldown_remaining = statusData.cooldown_period_seconds || 120;
+                delete cameraDeviceDurations[cameraId];
             }
 
-            const durations = statusData.device_durations || [];
-            const durationText = durations.length > 0 ? `Duration: ${durations.join('s, ')}s` : 'Duration: Not configured';
+            // Calculate remaining device duration
+            const initialDuration = cameraDeviceDurations[cameraId] || 0;
+            const durationRemaining = Math.floor(Math.max(0, initialDuration - statusData.session_elapsed_seconds));
+            const durationText = initialDuration > 0
+                ? `Duration: ${durationRemaining}s`
+                : 'Duration: Not configured';
 
             footerElement.innerHTML = `
                 <div class="footer-status active">

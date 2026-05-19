@@ -622,8 +622,9 @@ footer {
 }
 
 .footer-info {
-    font-size: 0.8rem;
-    opacity: 0.85;
+    font-weight: bold;
+    font-size: 0.95rem;
+    opacity: 1;
 }
 
 .footer-status.active {
