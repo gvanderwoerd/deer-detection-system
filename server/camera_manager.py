@@ -529,6 +529,9 @@ class CameraManager:
             from device_manager import get_device_manager
 
             logger.info(f"🎯 Detection worker started for {camera.name}")
+            logger.info(f"   Device assignments: {len(camera.device_assignments)} device(s)")
+            for idx, assignment in enumerate(camera.device_assignments):
+                logger.info(f"   - Device {idx+1}: {assignment.get('device_id')} ({assignment.get('duration_seconds')}s)")
 
             while True:
                 try:
@@ -566,22 +569,33 @@ class CameraManager:
                                         saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
                                         logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename}")
 
-                                    # Activate sprinkler if target animal (not person)
-                                    if deer_detected and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
+                                    # Check if this animal type is enabled in camera settings
+                                    enabled_objects = camera.detection_config.get('enabled_objects', {})
+                                    is_enabled = enabled_objects.get(animal_type.lower(), False)
+
+                                    # Activate sprinkler if target animal is enabled (not person, safety check is in detector)
+                                    if deer_detected and is_enabled and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
                                         camera.session_detections += 1
                                         camera.last_detection = datetime.now().isoformat()
                                         logger.info(f"🎯 [{camera.name}] {animal_type.upper()} detected! (#{camera.session_detections})")
 
                                         # Activate assigned devices
                                         dm = get_device_manager()
+                                        logger.info(f"💨 [{camera.name}] Attempting to activate {len(camera.device_assignments)} device(s)")
+                                        if not camera.device_assignments:
+                                            logger.warning(f"⚠️ [{camera.name}] No device assignments configured!")
+
                                         for assignment in camera.device_assignments:
                                             device_id = assignment['device_id']
                                             duration = assignment['duration_seconds']
                                             try:
+                                                logger.info(f"💨 [{camera.name}] Calling turn_on({device_id}, duration={duration})")
                                                 dm.turn_on(device_id, duration=duration)
-                                                logger.info(f"💨 [{camera.name}] Activated {device_id} for {duration}s")
+                                                logger.info(f"✅ [{camera.name}] Device {device_id} activated for {duration}s")
                                             except Exception as e:
-                                                logger.error(f"Failed to activate device: {e}")
+                                                logger.error(f"❌ [{camera.name}] Failed to activate device {device_id}: {e}")
+                                    elif deer_detected and not is_enabled:
+                                        logger.info(f"ℹ️ [{camera.name}] {animal_type.upper()} detected but disabled in camera settings - not activating sprinkler")
 
                             except Exception as e:
                                 logger.error(f"[{camera.name}] Detection error: {e}")
