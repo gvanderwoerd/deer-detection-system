@@ -190,13 +190,15 @@ class DeerDetectionSystem:
                         time.sleep(0.1)
                         continue
 
-                    # Copy PIR and WiFi status from first camera
+                    # Copy PIR and WiFi status from camera, trigger per-camera detection
                     if camera.motion_active != self.motion_active:
                         self.motion_active = camera.motion_active
                         if camera.motion_active:
                             self.last_detection_time = datetime.now()
-                            logger.info("🎯 PIR: MOTION DETECTED - Auto-triggering detection")
-                            self.trigger_motion()
+                            logger.info(f"🎯 PIR: MOTION DETECTED on {camera.name} - Auto-triggering detection")
+                            # Trigger per-camera detection
+                            if camera.trigger_detection():
+                                logger.info(f"✅ [{camera.name}] Detection session started via PIR")
                         socketio.emit('motion_status', {'active': camera.motion_active})
                         logger.info(f"PIR: {'MOTION DETECTED' if camera.motion_active else 'no motion'}")
 
@@ -342,7 +344,14 @@ class DeerDetectionSystem:
         return True
 
     def _start_detection_session(self):
-        """Start a detection session"""
+        """
+        DEPRECATED: Detection sessions are now handled per-camera by CameraManager
+        This method is kept for backward compatibility but does nothing.
+        Per-camera detection is triggered automatically via PIR motion or manual /api/trigger
+        """
+        logger.debug("_start_detection_session called (deprecated - using per-camera detection instead)")
+        return
+
         def session_worker():
             logger.info(f"Detection session started for {ACTIVE_WINDOW_SECONDS} seconds")
 
@@ -610,11 +619,32 @@ def api_debug():
 
 @app.route('/api/trigger', methods=['POST'])
 def api_trigger():
-    """Manual trigger (for testing)"""
-    if system.trigger_motion():
-        return jsonify({'success': True, 'message': 'Motion triggered'})
+    """Manual trigger - supports per-camera triggering"""
+    data = request.get_json() or {}
+    camera_id = data.get('camera_id')
+
+    if camera_id:
+        # Per-camera trigger
+        cm = get_camera_manager()
+        camera = cm.get_camera(camera_id)
+        if not camera:
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+
+        if camera.trigger_detection():
+            return jsonify({'success': True, 'message': f'Detection triggered for {camera.name}'})
+        else:
+            return jsonify({'success': False, 'message': 'Trigger ignored - in cooldown or already active'})
     else:
-        return jsonify({'success': False, 'message': 'Trigger ignored'})
+        # Legacy: trigger default camera (for backward compatibility)
+        cm = get_camera_manager()
+        cameras = cm.get_all_cameras()
+        if cameras:
+            camera_id = cameras[0]['id']
+            camera = cm.get_camera(camera_id)
+            if camera and camera.trigger_detection():
+                return jsonify({'success': True, 'message': f'Detection triggered for {camera.name}'})
+
+        return jsonify({'success': False, 'message': 'No camera available or trigger ignored'})
 
 
 @app.route('/api/system/enable', methods=['POST'])
@@ -629,6 +659,50 @@ def api_disable():
     """Disable system"""
     system.disable_system()
     return jsonify({'success': True, 'message': 'System disabled'})
+
+
+@app.route('/api/cameras/<camera_id>/trigger', methods=['POST'])
+def api_trigger_camera(camera_id):
+    """Trigger detection session for a specific camera"""
+    cm = get_camera_manager()
+    camera = cm.get_camera(camera_id)
+
+    if not camera:
+        return jsonify({'success': False, 'error': 'Camera not found'}), 404
+
+    if camera.trigger_detection():
+        logger.info(f"✅ Manual trigger: Detection session started for {camera.name}")
+        return jsonify({'success': True, 'message': f'Detection triggered for {camera.name}'})
+    else:
+        return jsonify({'success': False, 'message': 'Trigger ignored - in cooldown or already active'})
+
+
+@app.route('/api/cameras/<camera_id>/detection/status', methods=['GET'])
+def api_camera_detection_status(camera_id):
+    """Get detection session status for a camera"""
+    cm = get_camera_manager()
+    camera = cm.get_camera(camera_id)
+
+    if not camera:
+        return jsonify({'success': False, 'error': 'Camera not found'}), 404
+
+    response = {
+        'success': True,
+        'camera_id': camera_id,
+        'camera_name': camera.name,
+        'session_active': camera.session_active,
+        'session_detections': camera.session_detections,
+        'cooldown_until': camera.cooldown_until,
+        'last_detection': camera.last_detection
+    }
+
+    if camera.session_active and camera.session_start:
+        elapsed = time.time() - camera.session_start
+        remaining = max(0, camera.timing['active_window_seconds'] - elapsed)
+        response['session_elapsed_seconds'] = elapsed
+        response['session_remaining_seconds'] = remaining
+
+    return jsonify(response)
 
 
 @app.route('/api/sprinkler/on', methods=['POST'])
