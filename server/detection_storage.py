@@ -154,6 +154,9 @@ class DetectionStorage:
         if camera_id:
             # Per-camera gallery
             metadata = self._load_camera_metadata(camera_id)
+            # Add camera_id to each detection for proper image path construction
+            for detection in metadata:
+                detection['camera_id'] = camera_id
         else:
             # All cameras: aggregate from all camera subdirectories
             metadata = []
