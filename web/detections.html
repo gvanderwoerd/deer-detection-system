@@ -381,30 +381,6 @@
             </div>
         </div>
 
-        <!-- Detection Configuration Section -->
-        <div class="detection-config-section">
-            <div class="config-title">🎯 Detection Configuration</div>
-            <div class="config-description">Select which objects should trigger gallery saves and sprinkler activation:</div>
-            <div class="config-checkboxes">
-                <label class="config-checkbox">
-                    <input type="checkbox" id="enableDeer" class="detection-checkbox" checked>
-                    <span class="checkbox-label">🦌 Deer/Horse</span>
-                </label>
-                <label class="config-checkbox">
-                    <input type="checkbox" id="enableCow" class="detection-checkbox" checked>
-                    <span class="checkbox-label">🐄 Cow</span>
-                </label>
-                <label class="config-checkbox">
-                    <input type="checkbox" id="enableSheep" class="detection-checkbox" checked>
-                    <span class="checkbox-label">🐑 Sheep</span>
-                </label>
-                <label class="config-checkbox">
-                    <input type="checkbox" id="enablePerson" class="detection-checkbox">
-                    <span class="checkbox-label">👤 Person</span>
-                </label>
-            </div>
-        </div>
-
         <div class="stats-bar" id="statsBar">
             <div class="stat-item">
                 <div class="stat-label">Total Detections</div>
@@ -456,21 +432,13 @@
 
     <script>
         let allDetections = [];
-        let detectionConfig = {
-            deer: true,
-            cow: true,
-            sheep: true,
-            person: false
-        };
 
         // Camera filtering state
         let currentCamera = null;  // null = all cameras
         let cameras = [];
 
-        // Load detections and configuration on page load
+        // Load detections on page load
         document.addEventListener('DOMContentLoaded', function() {
-            loadDetectionConfig();
-            setupConfigCheckboxes();
             loadCameras();
             loadDetections();
         });
@@ -616,57 +584,6 @@
             if (stats.oldest) {
                 document.getElementById('oldestDate').textContent = formatDate(stats.oldest);
             }
-        }
-
-        function loadDetectionConfig() {
-            // Load configuration from localStorage
-            const saved = localStorage.getItem('detectionConfig');
-            if (saved) {
-                detectionConfig = JSON.parse(saved);
-            }
-        }
-
-        function setupConfigCheckboxes() {
-            // Apply saved configuration to checkboxes
-            document.getElementById('enableDeer').checked = detectionConfig.deer;
-            document.getElementById('enableCow').checked = detectionConfig.cow;
-            document.getElementById('enableSheep').checked = detectionConfig.sheep;
-            document.getElementById('enablePerson').checked = detectionConfig.person;
-
-            // Add event listeners to checkboxes
-            document.getElementById('enableDeer').addEventListener('change', function() {
-                detectionConfig.deer = this.checked;
-                saveDetectionConfig();
-                loadDetections(); // Reload to update display
-            });
-
-            document.getElementById('enableCow').addEventListener('change', function() {
-                detectionConfig.cow = this.checked;
-                saveDetectionConfig();
-                loadDetections();
-            });
-
-            document.getElementById('enableSheep').addEventListener('change', function() {
-                detectionConfig.sheep = this.checked;
-                saveDetectionConfig();
-                loadDetections();
-            });
-
-            document.getElementById('enablePerson').addEventListener('change', function() {
-                detectionConfig.person = this.checked;
-                saveDetectionConfig();
-                loadDetections();
-            });
-        }
-
-        function saveDetectionConfig() {
-            localStorage.setItem('detectionConfig', JSON.stringify(detectionConfig));
-            // Also send to backend for server-side enforcement
-            fetch('/api/detection-config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(detectionConfig)
-            }).catch(err => console.log('Config save optional:', err));
         }
 
         function formatDateTime(isoString) {

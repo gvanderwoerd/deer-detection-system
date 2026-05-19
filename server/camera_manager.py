@@ -526,7 +526,7 @@ class CameraManager:
 
         def detection_worker():
             """Process frames for this camera during detection sessions"""
-            from config import SAVE_CLASS_IDS, MAX_DETECTIONS_PER_SESSION
+            from config import MAX_DETECTIONS_PER_SESSION
             from device_manager import get_device_manager
 
             logger.info(f"🎯 Detection worker started for {camera.name}")
@@ -565,14 +565,16 @@ class CameraManager:
                                     animal_type = detections[0]['class']
                                     class_id = detections[0].get('class_id')
 
-                                    # Save to gallery if in save list
-                                    if class_id in SAVE_CLASS_IDS:
-                                        saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
-                                        logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename}")
-
                                     # Check if this animal type is enabled in camera settings
                                     enabled_objects = camera.detection_config.get('enabled_objects', {})
                                     is_enabled = enabled_objects.get(animal_type.lower(), False)
+
+                                    # Save to gallery only if enabled in camera settings
+                                    if is_enabled:
+                                        saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
+                                        logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename}")
+                                    else:
+                                        logger.info(f"ℹ️ [{camera.name}] {animal_type.upper()} detected but disabled in camera settings - not saving")
 
                                     # Activate sprinkler if target animal is enabled (not person, safety check is in detector)
                                     if deer_detected and is_enabled and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
