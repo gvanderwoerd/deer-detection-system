@@ -98,6 +98,8 @@ async function startCamera() {
 
     if (result.success !== false) {
         cameraActive = true;
+        console.log(`[CAMERA] Detection triggered for camera: ${targetCameraId}`);
+
         if (elements.btnToggleCamera) {
             elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
             elements.btnToggleCamera.classList.remove('btn-secondary');
@@ -116,6 +118,7 @@ async function startCamera() {
                 fetchCameraStatus(targetCameraId);
             }
         }, 1000);  // Update every second for live timers
+        console.log(`[CAMERA] Status polling started for camera: ${targetCameraId}`);
 
         // Keep camera alive by polling status
         cameraKeepAliveInterval = setInterval(() => {
@@ -535,6 +538,14 @@ async function fetchCameraStatus(cameraId) {
         const result = await apiCall(`/cameras/${cameraId}/detection/status`);
 
         if (result.success !== false) {
+            console.log(`[STATUS] Camera ${cameraId}:`, {
+                session_active: result.session_active,
+                session_detections: result.session_detections,
+                session_elapsed: result.session_elapsed_seconds,
+                active_window: result.active_window_seconds,
+                cooldown_remaining: result.cooldown_remaining
+            });
+
             // Store status data for this camera
             cameraStatusData[cameraId] = result;
 
@@ -587,7 +598,12 @@ async function fetchCameraStatus(cameraId) {
 // Update camera card footer with countdown display
 function updateCameraFooter(cameraId, statusData) {
     const footerElement = document.getElementById(`camera-footer-${cameraId}`);
-    if (!footerElement) return;
+    if (!footerElement) {
+        console.warn(`[FOOTER] Footer element not found for camera: ${cameraId}`);
+        return;
+    }
+
+    console.log(`[FOOTER] Updating footer for camera ${cameraId}, session_active=${statusData.session_active}`);
 
     let footerHtml = '';
 
