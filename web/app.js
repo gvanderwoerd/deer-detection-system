@@ -107,9 +107,14 @@ async function startCamera() {
         const result = await apiCall(`/cameras/${targetCameraId}/trigger`, 'POST');
         console.log(`[CAMERA] API response:`, JSON.stringify(result));
 
-        if (result.success !== false) {
+        // Start status polling and intervals regardless of trigger result
+        // (session might already be active from server auto-trigger)
+        const shouldStartPolling = result.success !== false ||
+                                  (result.message && result.message.includes('already active'));
+
+        if (shouldStartPolling) {
             cameraActive = true;
-            console.log(`[CAMERA] Detection triggered for camera: ${targetCameraId}`);
+            console.log(`[CAMERA] Detection session active for camera: ${targetCameraId}`);
 
             if (elements.btnToggleCamera) {
                 elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
@@ -139,6 +144,10 @@ async function startCamera() {
             }, 3000);
 
             addLogEntry('camera', 'Camera feed active');
+
+            if (result.success === false) {
+                console.log(`[CAMERA] Note: ${result.message}`);
+            }
         } else {
             console.log(`[CAMERA] API call failed:`, JSON.stringify(result));
             const errorMsg = result.error || result.message || 'Failed to trigger camera';
