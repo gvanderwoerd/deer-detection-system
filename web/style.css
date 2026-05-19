@@ -601,6 +601,49 @@ footer {
     color: white;
 }
 
+/* Camera Grid Footer */
+.camera-grid-footer {
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.footer-status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.footer-timer {
+    font-weight: bold;
+    font-size: 0.95rem;
+}
+
+.footer-info {
+    font-size: 0.8rem;
+    opacity: 0.85;
+}
+
+.footer-status.active {
+    background-color: rgba(0, 200, 83, 0.15);
+    color: var(--accent-success);
+    border: 1px solid rgba(0, 200, 83, 0.3);
+}
+
+.footer-status.cooldown {
+    background-color: rgba(255, 167, 38, 0.15);
+    color: #ffa726;
+    border: 1px solid rgba(255, 167, 38, 0.3);
+}
+
+.footer-status.idle {
+    background-color: rgba(156, 156, 156, 0.1);
+    color: var(--text-secondary);
+    border: 1px solid rgba(156, 156, 156, 0.2);
+}
+
 /* Responsive grid adjustments */
 @media (max-width: 1024px) {
     .cameras-grid {

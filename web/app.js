@@ -76,6 +76,8 @@ let previousMotionActive = false;  // Track previous motion state for auto-start
 let selectedCameraId = null;  // Track selected camera for per-camera control
 let availableCameras = [];  // List of available cameras
 let cameraStatusInterval = null;  // Interval for polling camera status
+let cameraStatusData = {};  // Store status data for each camera
+let cameraCountdownIntervals = {};  // Store countdown intervals for each camera
 
 // Camera control functions
 async function startCamera() {
@@ -532,45 +534,164 @@ async function fetchCameraStatus(cameraId) {
     try {
         const result = await apiCall(`/cameras/${cameraId}/detection/status`);
 
-        if (result.success !== false && elements.cameraStatusPanel) {
-            elements.cameraStatusPanel.style.display = 'block';
+        if (result.success !== false) {
+            // Store status data for this camera
+            cameraStatusData[cameraId] = result;
 
-            if (elements.cameraStatusContent) {
-                // Get camera name
-                const camera = availableCameras.find(c => c.id === cameraId);
-                const cameraName = camera ? camera.name : cameraId;
+            // Update camera card footer with countdown
+            updateCameraFooter(cameraId, result);
 
-                // Calculate remaining time
-                let statusHtml = `<strong>${cameraName}</strong><br>`;
+            // Update right panel if available
+            if (elements.cameraStatusPanel) {
+                elements.cameraStatusPanel.style.display = 'block';
 
-                if (result.session_active) {
-                    const elapsed = result.session_elapsed_seconds || 0;
-                    const remaining = Math.max(0, (result.active_window_seconds || 60) - elapsed);
-                    const detections = result.session_detections || 0;
+                if (elements.cameraStatusContent) {
+                    // Get camera name
+                    const camera = availableCameras.find(c => c.id === cameraId);
+                    const cameraName = camera ? camera.name : cameraId;
 
-                    statusHtml += `<div style="color: #4CAF50;">
-                        <strong>🟢 DETECTION ACTIVE</strong><br>
-                        Remaining: <strong>${remaining}s</strong><br>
-                        Detections: <strong>${detections}</strong>
-                    </div>`;
-                } else if (result.cooldown_remaining > 0) {
-                    statusHtml += `<div style="color: #ffa726;">
-                        <strong>⏳ COOLDOWN</strong><br>
-                        Remaining: <strong>${result.cooldown_remaining}s</strong>
-                    </div>`;
-                } else {
-                    statusHtml += `<div style="color: #999;">
-                        <strong>⚪ IDLE</strong><br>
-                        Ready for detection
-                    </div>`;
+                    // Calculate remaining time
+                    let statusHtml = `<strong>${cameraName}</strong><br>`;
+
+                    if (result.session_active) {
+                        const elapsed = result.session_elapsed_seconds || 0;
+                        const remaining = Math.max(0, (result.active_window_seconds || 60) - elapsed);
+                        const detections = result.session_detections || 0;
+
+                        statusHtml += `<div style="color: #4CAF50;">
+                            <strong>🟢 DETECTION ACTIVE</strong><br>
+                            Remaining: <strong>${remaining}s</strong><br>
+                            Detections: <strong>${detections}</strong>
+                        </div>`;
+                    } else if (result.cooldown_remaining > 0) {
+                        statusHtml += `<div style="color: #ffa726;">
+                            <strong>⏳ COOLDOWN</strong><br>
+                            Remaining: <strong>${result.cooldown_remaining}s</strong>
+                        </div>`;
+                    } else {
+                        statusHtml += `<div style="color: #999;">
+                            <strong>⚪ IDLE</strong><br>
+                            Ready for detection
+                        </div>`;
+                    }
+
+                    elements.cameraStatusContent.innerHTML = statusHtml;
                 }
-
-                elements.cameraStatusContent.innerHTML = statusHtml;
             }
         }
     } catch (error) {
         console.error('Failed to fetch camera status:', error);
     }
+}
+
+// Update camera card footer with countdown display
+function updateCameraFooter(cameraId, statusData) {
+    const footerElement = document.getElementById(`camera-footer-${cameraId}`);
+    if (!footerElement) return;
+
+    let footerHtml = '';
+
+    if (statusData.session_active) {
+        const elapsed = statusData.session_elapsed_seconds || 0;
+        const remaining = Math.max(0, (statusData.active_window_seconds || 60) - elapsed);
+        const detections = statusData.session_detections || 0;
+
+        footerHtml = `
+            <div class="footer-status active">
+                <div class="footer-timer">🟢 ACTIVE: ${remaining}s</div>
+                <div class="footer-info">Detections: ${detections}</div>
+            </div>
+        `;
+    } else if (statusData.cooldown_remaining > 0) {
+        footerHtml = `
+            <div class="footer-status cooldown">
+                <div class="footer-timer">⏳ COOLDOWN: ${statusData.cooldown_remaining}s</div>
+            </div>
+        `;
+    } else {
+        footerHtml = `
+            <div class="footer-status idle">
+                <div class="footer-timer">⚪ IDLE</div>
+            </div>
+        `;
+    }
+
+    footerElement.innerHTML = footerHtml;
+
+    // Start countdown interval if not already running
+    if ((statusData.session_active || statusData.cooldown_remaining > 0) && !cameraCountdownIntervals[cameraId]) {
+        startCountdownTimer(cameraId);
+    } else if (!statusData.session_active && statusData.cooldown_remaining === 0) {
+        // Clear interval if no longer active
+        if (cameraCountdownIntervals[cameraId]) {
+            clearInterval(cameraCountdownIntervals[cameraId]);
+            delete cameraCountdownIntervals[cameraId];
+        }
+    }
+}
+
+// Start countdown timer for a camera
+function startCountdownTimer(cameraId) {
+    // Clear existing interval if any
+    if (cameraCountdownIntervals[cameraId]) {
+        clearInterval(cameraCountdownIntervals[cameraId]);
+    }
+
+    cameraCountdownIntervals[cameraId] = setInterval(() => {
+        const statusData = cameraStatusData[cameraId];
+        if (!statusData) {
+            clearInterval(cameraCountdownIntervals[cameraId]);
+            delete cameraCountdownIntervals[cameraId];
+            return;
+        }
+
+        const footerElement = document.getElementById(`camera-footer-${cameraId}`);
+        if (!footerElement) {
+            clearInterval(cameraCountdownIntervals[cameraId]);
+            delete cameraCountdownIntervals[cameraId];
+            return;
+        }
+
+        // Decrement timers locally
+        if (statusData.session_active) {
+            statusData.session_elapsed_seconds = (statusData.session_elapsed_seconds || 0) + 1;
+            const remaining = Math.max(0, (statusData.active_window_seconds || 60) - statusData.session_elapsed_seconds);
+
+            if (remaining <= 0) {
+                // Session ended, will fetch new status next poll
+                statusData.session_active = false;
+                statusData.cooldown_remaining = statusData.cooldown_period_seconds || 120;
+            }
+
+            const detections = statusData.session_detections || 0;
+            footerElement.innerHTML = `
+                <div class="footer-status active">
+                    <div class="footer-timer">🟢 ACTIVE: ${remaining}s</div>
+                    <div class="footer-info">Detections: ${detections}</div>
+                </div>
+            `;
+        } else if (statusData.cooldown_remaining > 0) {
+            statusData.cooldown_remaining = Math.max(0, statusData.cooldown_remaining - 1);
+
+            if (statusData.cooldown_remaining <= 0) {
+                // Cooldown ended
+                clearInterval(cameraCountdownIntervals[cameraId]);
+                delete cameraCountdownIntervals[cameraId];
+                footerElement.innerHTML = `
+                    <div class="footer-status idle">
+                        <div class="footer-timer">⚪ IDLE</div>
+                    </div>
+                `;
+                return;
+            }
+
+            footerElement.innerHTML = `
+                <div class="footer-status cooldown">
+                    <div class="footer-timer">⏳ COOLDOWN: ${statusData.cooldown_remaining}s</div>
+                </div>
+            `;
+        }
+    }, 1000);  // Update every second
 }
 
 // Button event handlers
@@ -869,7 +990,7 @@ function createCameraCard(camera) {
     const offlinePlaceholder = isOnline ? '' : `<div class="offline-placeholder"><p>📷 ${camera.name} Offline</p></div>`;
 
     return `
-        <div class="camera-grid-card">
+        <div class="camera-grid-card" id="camera-card-${camera.id}">
             <div class="camera-grid-header">
                 <div class="camera-grid-name">${escapeHtml(camera.name)}</div>
                 <div class="camera-grid-status ${statusClass}">${statusText}</div>
@@ -881,6 +1002,9 @@ function createCameraCard(camera) {
             <div class="camera-grid-info">
                 <span>Session: ${camera.state.session_detections || 0}</span>
                 <span>Enabled: ${camera.enabled ? '✓' : '✗'}</span>
+            </div>
+            <div class="camera-grid-footer" id="camera-footer-${camera.id}">
+                <div class="footer-status">⚪ IDLE</div>
             </div>
             <button class="camera-grid-action" onclick="window.location.href='/cameras#${camera.id}'">⚙️ Edit</button>
         </div>
