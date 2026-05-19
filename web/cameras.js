@@ -41,34 +41,21 @@ class CameraManager {
     }
 
     async loadCameras() {
-        try {
-            const response = await fetch('/api/cameras');
-            const data = await response.json();
-
-            if (data.success) {
-                this.cameras = data.cameras;
-                this.renderCameras();
-            } else {
-                this.showError('Failed to load cameras: ' + data.error);
-            }
-        } catch (error) {
-            this.showError('Error loading cameras: ' + error.message);
+        const data = await apiCall('/cameras');
+        if (data.success) {
+            this.cameras = data.cameras;
+            this.renderCameras();
+        } else {
+            this.showError('Failed to load cameras: ' + data.error);
         }
     }
 
     async loadDevices() {
-        try {
-            const response = await fetch('/api/devices');
-            const data = await response.json();
-
-            if (data.success) {
-                this.devices = data.devices || [];
-            } else {
-                console.warn('Failed to load devices:', data.error);
-                this.devices = [];
-            }
-        } catch (error) {
-            console.warn('Error loading devices:', error.message);
+        const data = await apiCall('/devices');
+        if (data.success) {
+            this.devices = data.devices || [];
+        } else {
+            console.warn('Failed to load devices:', data.error);
             this.devices = [];
         }
     }
@@ -176,26 +163,16 @@ class CameraManager {
             stream_url: document.getElementById('cameraStreamUrl').value
         };
 
-        try {
-            const response = await fetch('/api/cameras', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+        const result = await apiCall('/cameras', 'POST', data);
 
-            const result = await response.json();
-
-            if (result.success) {
-                this.showModalSuccess('Camera registered successfully! Opening configuration...');
-                setTimeout(() => {
-                    this.hideAddCameraModal();
-                    this.loadCameras();
-                }, 1000);
-            } else {
-                this.showModalError('Failed to register camera: ' + result.error);
-            }
-        } catch (error) {
-            this.showModalError('Error: ' + error.message);
+        if (result.success) {
+            this.showModalSuccess('Camera registered successfully! Opening configuration...');
+            setTimeout(() => {
+                this.hideAddCameraModal();
+                this.loadCameras();
+            }, 1000);
+        } else {
+            this.showModalError('Failed to register camera: ' + (result.error || 'Unknown error'));
         }
     }
 
@@ -242,21 +219,16 @@ class CameraManager {
         btn.disabled = true;
         btn.textContent = 'Testing...';
 
-        try {
-            const response = await fetch(`/api/cameras/${cameraId}/test`, { method: 'POST' });
-            const result = await response.json();
+        const result = await apiCall(`/cameras/${cameraId}/test`, 'POST');
 
-            if (result.success) {
-                alert(`✓ ${camera.name} is online!\n\nLatency: ${result.result.latency_ms}ms\nFrames: ${result.result.frames_captured}`);
-            } else {
-                alert(`✗ ${camera.name} is offline.\n\nError: ${result.error}`);
-            }
-        } catch (error) {
-            alert(`Error testing camera: ${error.message}`);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Test';
+        if (result.success) {
+            alert(`✓ ${camera.name} is online!\n\nLatency: ${result.result.latency_ms}ms\nFrames: ${result.result.frames_captured}`);
+        } else {
+            alert(`✗ ${camera.name} is offline.\n\nError: ${result.error || 'Unknown error'}`);
         }
+
+        btn.disabled = false;
+        btn.textContent = 'Test';
     }
 
     showEditCameraModal(cameraId) {
@@ -390,26 +362,16 @@ class CameraManager {
             device_assignments: deviceAssignments
         };
 
-        try {
-            const response = await fetch(`/api/cameras/${cameraId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+        const result = await apiCall(`/cameras/${cameraId}`, 'PUT', data);
 
-            const result = await response.json();
-
-            if (result.success) {
-                this.showEditModalSuccess('Camera settings updated successfully!');
-                setTimeout(() => {
-                    this.hideEditCameraModal();
-                    this.loadCameras();
-                }, 1000);
-            } else {
-                this.showEditModalError('Failed to update camera: ' + result.error);
-            }
-        } catch (error) {
-            this.showEditModalError('Error: ' + error.message);
+        if (result.success) {
+            this.showEditModalSuccess('Camera settings updated successfully!');
+            setTimeout(() => {
+                this.hideEditCameraModal();
+                this.loadCameras();
+            }, 1000);
+        } else {
+            this.showEditModalError('Failed to update camera: ' + (result.error || 'Unknown error'));
         }
     }
 
@@ -421,18 +383,13 @@ class CameraManager {
             return;
         }
 
-        try {
-            const response = await fetch(`/api/cameras/${cameraId}`, { method: 'DELETE' });
-            const result = await response.json();
+        const result = await apiCall(`/cameras/${cameraId}`, 'DELETE');
 
-            if (result.success) {
-                alert(`✓ Camera "${camera.name}" deleted successfully`);
-                this.loadCameras();
-            } else {
-                alert(`✗ Failed to delete camera: ${result.error}`);
-            }
-        } catch (error) {
-            alert(`Error deleting camera: ${error.message}`);
+        if (result.success) {
+            alert(`✓ Camera "${camera.name}" deleted successfully`);
+            this.loadCameras();
+        } else {
+            alert(`✗ Failed to delete camera: ${result.error || 'Unknown error'}`);
         }
     }
 
