@@ -223,18 +223,32 @@ The diagnostics test:
 4. Wait 5 seconds for startup
 5. Try accessing dashboard again
 
-**Solution B: Port 5000 in use**
+**Solution B: Port 5000 in use (Multiple server instances)**
 1. Another process is using port 5000
-2. Kill stuck processes:
+2. Check what's using the port:
+   ```bash
+   lsof -i :5000
+   ```
+3. Kill all processes on port 5000:
+   ```bash
+   lsof -ti:5000 | xargs kill -9
+   ```
+4. Verify port is free (should return nothing):
+   ```bash
+   lsof -i :5000
+   ```
+5. Restart server:
    ```bash
    ./stop.sh
    sleep 2
    ./start.sh
    ```
-3. If still fails, reboot:
+6. If still fails, reboot:
    ```bash
    sudo reboot
    ```
+
+**Note:** If `start.sh` appears to complete but browser shows "Connection refused", this usually means multiple server instances are running simultaneously. Always use `./stop.sh` before restarting.
 
 **Solution C: Network/IP address wrong**
 1. Verify server IP address:
@@ -254,6 +268,54 @@ The diagnostics test:
    ```bash
    sudo ufw allow 5000
    ```
+
+---
+
+### Issue #7: ESP32-CAM shows "Waiting for camera..."
+
+**Symptoms:**
+- Dashboard displays "Waiting for camera..." overlay
+- No video feed visible
+- Server logs show "Frame capture error: No route to host"
+
+**Important:** This is **NORMAL** if the ESP32-CAM is offline or unplugged.
+
+**Understanding the Behavior:**
+- The server gracefully handles the camera being offline
+- Automatic reconnection attempts every 5 seconds
+- Dashboard remains functional during camera downtime
+- Will automatically reconnect when camera comes online
+- No action needed if camera is intentionally off
+
+**Solutions:**
+
+**Solution A: Camera is powered off (Expected behavior)**
+1. This is normal - no action needed if camera is intentionally off
+2. Power on the ESP32-CAM when ready
+3. Server will automatically detect and reconnect
+4. Wait 5-10 seconds for video feed to appear
+
+**Solution B: Camera is on but not responding**
+1. Verify ESP32-CAM has power (check LED)
+2. Test camera connectivity:
+   ```bash
+   curl -I http://192.168.1.100:81/stream
+   # or
+   curl -I http://esp32cam.local:81/stream
+   ```
+3. Expected results:
+   - Camera offline: Timeout or "No route to host"
+   - Camera online: HTTP 200 OK
+4. If timeout, check WiFi connection on camera
+5. Power cycle camera if needed
+
+**Solution C: Camera on wrong IP address**
+1. Check camera's current IP:
+   ```bash
+   ping esp32cam.local
+   ```
+2. If different from expected (192.168.1.100), update config
+3. Or use mDNS hostname instead: `http://esp32cam.local:81/`
 
 ---
 
@@ -309,6 +371,73 @@ The diagnostics test:
    curl -X POST http://localhost:5000/api/detections/delete -H "Content-Type: application/json" -d '{"age_filter":"week"}'
    ```
 3. Valid filters: all, year, month, week, day, hour, 10min
+
+---
+
+## Quick Commands Reference
+
+### System Status
+```bash
+# Check if server is running
+lsof -i :5000
+
+# Check what's using port 5000
+lsof -ti:5000
+
+# View real-time logs
+tail -f logs/server.log
+
+# View last 50 log entries
+tail -50 logs/server.log
+
+# Check system status via API
+curl http://localhost:5000/api/status | python3 -m json.tool
+
+# Check health status
+curl http://localhost:5000/api/health | python3 -m json.tool
+```
+
+### Device Management
+```bash
+# List all devices
+curl http://localhost:5000/api/devices | python3 -m json.tool
+
+# Force refresh devices
+curl -X POST http://localhost:5000/api/devices/refresh
+
+# Emergency stop all valves
+curl -X POST http://localhost:5000/api/devices/emergency_stop
+```
+
+### Start/Stop
+```bash
+# Start system
+cd /mnt/linux-data/deer-detection-system
+./start.sh
+
+# Stop system
+./stop.sh
+
+# Restart (proper way)
+./stop.sh && sleep 2 && ./start.sh
+```
+
+### Dashboard Access
+- **Main Dashboard:** http://localhost:5000 or http://192.168.1.15:5000
+- **Diagnostics:** http://192.168.1.15:5000/diagnostics
+- **Setup:** http://192.168.1.15:5000/setup
+- **Device Manager:** http://192.168.1.15:5000/devices
+- **Detection Gallery:** http://192.168.1.15:5000/detections
+
+### Camera Testing
+```bash
+# Test ESP32-CAM connectivity
+curl -I http://192.168.1.100:81/stream
+curl -I http://esp32cam.local:81/stream
+
+# Ping camera
+ping esp32cam.local
+```
 
 ---
 
@@ -374,6 +503,9 @@ curl http://localhost:5000/api/health
 - Review PROJECT_LOG.md for any firmware updates
 - Check FIRMWARE_NOTES.md if considering ESP32 changes
 - Test full detection → activation → cooldown flow
+
+### Historical Issues Log:
+- **2026-02-16:** Multiple instance issue - Two server processes created simultaneously, causing port conflicts. Fix: Enhanced `start.sh` to verify instance cleanup. Prevention: Always use `./stop.sh` before restarting.
 
 ---
 

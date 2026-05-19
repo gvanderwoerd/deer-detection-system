@@ -217,10 +217,9 @@ deer-detection-system/
 
 ## Documentation
 
-- **Project Log:** `PROJECT_LOG.md` - Recent updates and history
+- **Project Log:** `PROJECT_LOG.md` - Complete project history and recent updates
 - **Firmware Guide:** `esp32-cam/FIRMWARE_NOTES.md` - **Critical ESP32-CAM documentation**
-- **Troubleshooting:** `TROUBLESHOOTING_QUICK_REF.md` - Quick fixes
-- **Changelog:** `CHANGELOG.md` - Detailed feature history
+- **Troubleshooting:** `SPRINKLER_TROUBLESHOOTING.md` - Comprehensive troubleshooting guide
 
 ---
 
@@ -252,7 +251,7 @@ MIT License - See LICENSE file for details
 ## Support
 
 For issues or questions:
-1. Check `TROUBLESHOOTING_QUICK_REF.md`
+1. Check `SPRINKLER_TROUBLESHOOTING.md` - comprehensive troubleshooting guide
 2. Review `esp32-cam/FIRMWARE_NOTES.md` (for camera issues)
 3. Check logs: `logs/server.log`
 4. Open issue: https://github.com/gvanderwoerd/deer-detection-system/issues

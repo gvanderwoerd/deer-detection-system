@@ -430,8 +430,7 @@ deer-detection-system/
 
 - **GitHub:** https://github.com/gvanderwoerd/deer-detection-system
 - **ESP32 Firmware Docs:** `esp32-cam/FIRMWARE_NOTES.md`
-- **Troubleshooting:** `TROUBLESHOOTING_QUICK_REF.md`
-- **Changelog:** `CHANGELOG.md`
+- **Troubleshooting:** `SPRINKLER_TROUBLESHOOTING.md`
 
 ---
 
