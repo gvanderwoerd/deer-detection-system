@@ -697,6 +697,10 @@ def api_camera_detection_status(camera_id):
         'last_detection': camera.last_detection
     }
 
+    # Add device assignment durations
+    device_durations = [assignment['duration_seconds'] for assignment in camera.device_assignments]
+    response['device_durations'] = device_durations
+
     # Calculate session elapsed time if active
     if camera.session_active and camera.session_start:
         elapsed = time.time() - camera.session_start

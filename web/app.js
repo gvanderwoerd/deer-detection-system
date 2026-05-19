@@ -635,20 +635,23 @@ function updateCameraFooter(cameraId, statusData) {
     let footerHtml = '';
 
     if (statusData.session_active) {
-        const elapsed = statusData.session_elapsed_seconds || 0;
-        const remaining = Math.max(0, (statusData.active_window_seconds || 60) - elapsed);
+        const elapsed = Math.floor(statusData.session_elapsed_seconds || 0);
+        const remaining = Math.floor(Math.max(0, (statusData.active_window_seconds || 60) - elapsed));
         const detections = statusData.session_detections || 0;
+        const durations = statusData.device_durations || [];
+        const durationText = durations.length > 0 ? `Duration: ${durations.join('s, ')}s` : 'Duration: Not configured';
 
         footerHtml = `
             <div class="footer-status active">
                 <div class="footer-timer">🟢 ACTIVE: ${remaining}s</div>
-                <div class="footer-info">Detections: ${detections}</div>
+                <div class="footer-info">${durationText}</div>
             </div>
         `;
     } else if (statusData.cooldown_remaining > 0) {
+        const cooldownSecs = Math.floor(statusData.cooldown_remaining);
         footerHtml = `
             <div class="footer-status cooldown">
-                <div class="footer-timer">⏳ COOLDOWN: ${statusData.cooldown_remaining}s</div>
+                <div class="footer-timer">⏳ COOLDOWN: ${cooldownSecs}s</div>
             </div>
         `;
     } else {
@@ -698,7 +701,7 @@ function startCountdownTimer(cameraId) {
         // Decrement timers locally
         if (statusData.session_active) {
             statusData.session_elapsed_seconds = (statusData.session_elapsed_seconds || 0) + 1;
-            const remaining = Math.max(0, (statusData.active_window_seconds || 60) - statusData.session_elapsed_seconds);
+            const remaining = Math.floor(Math.max(0, (statusData.active_window_seconds || 60) - statusData.session_elapsed_seconds));
 
             if (remaining <= 0) {
                 // Session ended, will fetch new status next poll
@@ -706,17 +709,20 @@ function startCountdownTimer(cameraId) {
                 statusData.cooldown_remaining = statusData.cooldown_period_seconds || 120;
             }
 
-            const detections = statusData.session_detections || 0;
+            const durations = statusData.device_durations || [];
+            const durationText = durations.length > 0 ? `Duration: ${durations.join('s, ')}s` : 'Duration: Not configured';
+
             footerElement.innerHTML = `
                 <div class="footer-status active">
                     <div class="footer-timer">🟢 ACTIVE: ${remaining}s</div>
-                    <div class="footer-info">Detections: ${detections}</div>
+                    <div class="footer-info">${durationText}</div>
                 </div>
             `;
         } else if (statusData.cooldown_remaining > 0) {
             statusData.cooldown_remaining = Math.max(0, statusData.cooldown_remaining - 1);
+            const cooldownSecs = Math.floor(statusData.cooldown_remaining);
 
-            if (statusData.cooldown_remaining <= 0) {
+            if (cooldownSecs <= 0) {
                 // Cooldown ended
                 clearInterval(cameraCountdownIntervals[cameraId]);
                 delete cameraCountdownIntervals[cameraId];
@@ -730,7 +736,7 @@ function startCountdownTimer(cameraId) {
 
             footerElement.innerHTML = `
                 <div class="footer-status cooldown">
-                    <div class="footer-timer">⏳ COOLDOWN: ${statusData.cooldown_remaining}s</div>
+                    <div class="footer-timer">⏳ COOLDOWN: ${cooldownSecs}s</div>
                 </div>
             `;
         }
