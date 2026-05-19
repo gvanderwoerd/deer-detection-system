@@ -1,284 +1,45 @@
 [
   {
-    "filename": "2026-05-18_17-15-12_person_0.31.jpg",
-    "timestamp": "2026-05-18T17:15:12.153260",
+    "filename": "2026-05-18_17-56-09_person_0.68.jpg",
+    "timestamp": "2026-05-18T17:56:09.646755",
     "animal_type": "person",
-    "confidence": 0.31020107865333557,
+    "confidence": 0.6792234778404236,
     "detection_count": 2,
     "detections": [
       {
         "class": "person",
-        "confidence": 0.31020107865333557,
+        "confidence": 0.6792234778404236,
         "bbox": [
-          7,
-          0,
-          797,
+          254,
+          36,
+          799,
           598
         ]
       },
       {
         "class": "person",
-        "confidence": 0.27308157086372375,
+        "confidence": 0.26296475529670715,
         "bbox": [
-          348,
-          4,
-          798,
-          599
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-15-12_person_0.70.jpg",
-    "timestamp": "2026-05-18T17:15:12.720002",
-    "animal_type": "person",
-    "confidence": 0.6971901655197144,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.6971901655197144,
-        "bbox": [
-          438,
-          3,
-          799,
-          598
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-15-13_person_0.39.jpg",
-    "timestamp": "2026-05-18T17:15:13.284967",
-    "animal_type": "person",
-    "confidence": 0.39086228609085083,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.39086228609085083,
-        "bbox": [
-          490,
-          24,
-          799,
-          598
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-20-57_person_0.29.jpg",
-    "timestamp": "2026-05-18T17:20:57.999112",
-    "animal_type": "person",
-    "confidence": 0.28708818554878235,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.28708818554878235,
-        "bbox": [
-          521,
-          54,
-          799,
-          547
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-20-58_person_0.49.jpg",
-    "timestamp": "2026-05-18T17:20:58.565004",
-    "animal_type": "person",
-    "confidence": 0.49414846301078796,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.49414846301078796,
-        "bbox": [
-          33,
-          0,
-          786,
-          588
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-21-02_person_0.62.jpg",
-    "timestamp": "2026-05-18T17:21:02.071173",
-    "animal_type": "person",
-    "confidence": 0.6163589954376221,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.6163589954376221,
-        "bbox": [
-          272,
-          3,
-          798,
-          597
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-21-02_person_0.32.jpg",
-    "timestamp": "2026-05-18T17:21:02.657878",
-    "animal_type": "person",
-    "confidence": 0.32239148020744324,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.32239148020744324,
-        "bbox": [
-          467,
-          7,
-          799,
-          587
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-40-09_person_0.26.jpg",
-    "timestamp": "2026-05-18T17:40:09.228871",
-    "animal_type": "person",
-    "confidence": 0.2552330195903778,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.2552330195903778,
-        "bbox": [
-          3,
-          1,
-          792,
-          586
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-40-13_person_0.73.jpg",
-    "timestamp": "2026-05-18T17:40:13.225983",
-    "animal_type": "person",
-    "confidence": 0.7278228998184204,
-    "detection_count": 2,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.7278228998184204,
-        "bbox": [
-          229,
           2,
-          799,
+          0,
+          798,
           596
         ]
-      },
-      {
-        "class": "person",
-        "confidence": 0.3068506419658661,
-        "bbox": [
-          1,
-          13,
-          638,
-          579
-        ]
       }
     ]
   },
   {
-    "filename": "2026-05-18_17-40-13_person_0.86.jpg",
-    "timestamp": "2026-05-18T17:40:13.804331",
+    "filename": "2026-05-18_17-56-10_person_0.87.jpg",
+    "timestamp": "2026-05-18T17:56:10.218405",
     "animal_type": "person",
-    "confidence": 0.8554320335388184,
+    "confidence": 0.865382194519043,
     "detection_count": 1,
     "detections": [
       {
         "class": "person",
-        "confidence": 0.8554320335388184,
+        "confidence": 0.865382194519043,
         "bbox": [
-          303,
-          0,
-          799,
-          598
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-40-14_person_0.82.jpg",
-    "timestamp": "2026-05-18T17:40:14.380908",
-    "animal_type": "person",
-    "confidence": 0.8185915946960449,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.8185915946960449,
-        "bbox": [
-          315,
-          0,
-          799,
-          598
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-40-14_person_0.66.jpg",
-    "timestamp": "2026-05-18T17:40:14.942324",
-    "animal_type": "person",
-    "confidence": 0.6623741388320923,
-    "detection_count": 2,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.6623741388320923,
-        "bbox": [
-          405,
-          0,
-          799,
-          598
-        ]
-      },
-      {
-        "class": "person",
-        "confidence": 0.2561996579170227,
-        "bbox": [
-          236,
-          7,
-          798,
-          598
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-42-45_person_0.66.jpg",
-    "timestamp": "2026-05-18T17:42:45.981038",
-    "animal_type": "person",
-    "confidence": 0.6579645872116089,
-    "detection_count": 2,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.6579645872116089,
-        "bbox": [
-          308,
-          2,
-          799,
-          598
-        ]
-      },
-      {
-        "class": "person",
-        "confidence": 0.5913639068603516,
-        "bbox": [
-          8,
+          237,
           0,
           799,
           597
@@ -287,75 +48,56 @@
     ]
   },
   {
-    "filename": "2026-05-18_17-42-46_person_0.86.jpg",
-    "timestamp": "2026-05-18T17:42:46.556904",
+    "filename": "2026-05-18_17-56-10_person_0.88.jpg",
+    "timestamp": "2026-05-18T17:56:10.778915",
     "animal_type": "person",
-    "confidence": 0.8552386164665222,
+    "confidence": 0.8773195147514343,
     "detection_count": 1,
     "detections": [
       {
         "class": "person",
-        "confidence": 0.8552386164665222,
+        "confidence": 0.8773195147514343,
         "bbox": [
-          349,
-          1,
-          798,
-          598
-        ]
-      }
-    ]
-  },
-  {
-    "filename": "2026-05-18_17-42-47_person_0.83.jpg",
-    "timestamp": "2026-05-18T17:42:47.132822",
-    "animal_type": "person",
-    "confidence": 0.8279081583023071,
-    "detection_count": 1,
-    "detections": [
-      {
-        "class": "person",
-        "confidence": 0.8279081583023071,
-        "bbox": [
-          353,
+          234,
           2,
-          798,
-          599
+          799,
+          598
         ]
       }
     ]
   },
   {
-    "filename": "2026-05-18_17-42-47_person_0.79.jpg",
-    "timestamp": "2026-05-18T17:42:47.692237",
+    "filename": "2026-05-18_17-56-11_person_0.87.jpg",
+    "timestamp": "2026-05-18T17:56:11.339640",
     "animal_type": "person",
-    "confidence": 0.7945576310157776,
+    "confidence": 0.8700972199440002,
     "detection_count": 1,
     "detections": [
       {
         "class": "person",
-        "confidence": 0.7945576310157776,
+        "confidence": 0.8700972199440002,
         "bbox": [
-          370,
-          7,
-          798,
-          600
+          260,
+          9,
+          799,
+          598
         ]
       }
     ]
   },
   {
-    "filename": "2026-05-18_17-42-48_person_0.84.jpg",
-    "timestamp": "2026-05-18T17:42:48.251795",
+    "filename": "2026-05-18_17-58-22_person_0.70.jpg",
+    "timestamp": "2026-05-18T17:58:22.702326",
     "animal_type": "person",
-    "confidence": 0.8445881009101868,
+    "confidence": 0.6971390247344971,
     "detection_count": 1,
     "detections": [
       {
         "class": "person",
-        "confidence": 0.8445881009101868,
+        "confidence": 0.6971390247344971,
         "bbox": [
-          393,
-          7,
+          214,
+          155,
           798,
           598
         ]
@@ -363,19 +105,19 @@
     ]
   },
   {
-    "filename": "2026-05-18_17-42-48_person_0.76.jpg",
-    "timestamp": "2026-05-18T17:42:48.812286",
+    "filename": "2026-05-18_17-58-23_person_0.71.jpg",
+    "timestamp": "2026-05-18T17:58:23.263245",
     "animal_type": "person",
-    "confidence": 0.756047248840332,
+    "confidence": 0.7113606333732605,
     "detection_count": 1,
     "detections": [
       {
         "class": "person",
-        "confidence": 0.756047248840332,
+        "confidence": 0.7113606333732605,
         "bbox": [
-          405,
-          18,
-          798,
+          281,
+          200,
+          799,
           599
         ]
       }

@@ -24,15 +24,14 @@ CAMERAS_CONFIG_FILE = 'cameras.json'  # Persistent camera registry (auto-migrate
 DETECTION_CONFIDENCE = 0.25  # Confidence threshold (0.0-1.0) - lowered for testing
 
 # COCO class IDs for target detection (trigger sprinkler)
-# 15: cat, 16: dog, 17: horse, 18: sheep, 19: cow, 20: elephant, 21: bear, 22: zebra, 23: giraffe
-TARGET_CLASS_IDS = [15, 16, 17, 18, 19, 20, 21, 22, 23]
+# 0: person, 15: cat, 16: dog, 17: horse, 18: sheep, 19: cow, 20: elephant, 21: bear, 22: zebra, 23: giraffe
+TARGET_CLASS_IDS = [0, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 
 # COCO class IDs to SAVE to detection gallery
 # Note: COCO doesn't have "deer" - using horse(17) and bear(21) as proxies
-# Person (0) is saved for testing but will NOT activate sprinkler (safety check)
-SAVE_CLASS_IDS = [0, 17, 18, 19, 21]  # person(test), horse(deer proxy), sheep, cow, bear(deer proxy)
+SAVE_CLASS_IDS = [0, 15, 16, 17, 18, 19, 20, 21, 22, 23]  # person, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe
 
-PERSON_CLASS_ID = 0  # COCO: person=0 (safety check - never activate with people)
+PERSON_CLASS_ID = 0  # COCO: person=0
 MODEL_PATH = 'yolov8n.pt'  # YOLOv8 nano model
 
 # === System Behavior ===

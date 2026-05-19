@@ -28,12 +28,11 @@ class DeerDetector:
         self.confidence_threshold = DETECTION_CONFIDENCE
         self.target_class_ids = TARGET_CLASS_IDS
         self.person_class_id = PERSON_CLASS_ID
-        logger.info(f"Target animals: {TARGET_CLASS_IDS} (deer, cow, sheep)")
-        logger.info(f"Safety check: Will NOT activate if person (class {PERSON_CLASS_ID}) detected")
+        logger.info(f"Target detections enabled: {TARGET_CLASS_IDS}")
 
     def detect_deer(self, frame):
         """
-        Detect target animals (deer, cow, sheep) with safety checks
+        Detect target objects (person, animals, etc)
 
         Args:
             frame: OpenCV image (BGR format)
@@ -50,7 +49,6 @@ class DeerDetector:
             results = self.model(frame, conf=self.confidence_threshold, verbose=False)
 
             animal_detected = False
-            person_detected = False
             detections = []
 
             # Process results
@@ -64,22 +62,10 @@ class DeerDetector:
                     # Log all detections for debugging
                     logger.info(f"Detected: {class_name} (class {class_id}) with confidence: {confidence:.2f}")
 
-                    # Get bounding box coordinates (used for both animals and people)
+                    # Get bounding box coordinates
                     x1, y1, x2, y2 = box.xyxy[0].tolist()
 
-                    # SAFETY CHECK: Detect if person is present
-                    if class_id == self.person_class_id:
-                        person_detected = True
-                        logger.warning(f"⚠️ PERSON DETECTED - Will NOT activate sprinkler!")
-                        # Add person to detections for gallery saving (testing purposes)
-                        detections.append({
-                            'bbox': (int(x1), int(y1), int(x2), int(y2)),
-                            'confidence': confidence,
-                            'class': class_name,
-                            'class_id': class_id
-                        })
-
-                    # Check if this is a target animal (deer, cow, sheep)
+                    # Check if this is a target object (person, animals, etc)
                     if class_id in self.target_class_ids:
                         animal_detected = True
 
@@ -90,18 +76,12 @@ class DeerDetector:
                             'class_id': class_id
                         })
 
-                        logger.info(f"🎯 TARGET ANIMAL ({class_name.upper()}) detected with confidence: {confidence:.2f}")
+                        logger.info(f"🎯 TARGET DETECTION ({class_name.upper()}) detected with confidence: {confidence:.2f}")
 
             # Get annotated frame
             annotated_frame = results[0].plot() if results else frame
 
-            # SAFETY: Only return True if animal detected AND no person detected
-            safe_to_activate = animal_detected and not person_detected
-
-            if animal_detected and person_detected:
-                logger.warning(f"❌ Animal detected but PERSON also present - BLOCKING activation for safety!")
-
-            return safe_to_activate, detections, annotated_frame
+            return animal_detected, detections, annotated_frame
 
         except Exception as e:
             logger.error(f"Detection error: {e}")

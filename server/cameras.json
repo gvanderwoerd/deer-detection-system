@@ -13,6 +13,7 @@
       "detection_config": {
         "confidence_threshold": 0.25,
         "enabled_objects": {
+          "person": true,
           "cat": true,
           "dog": true,
           "horse": true,
@@ -37,7 +38,7 @@
         "online": true,
         "session_active": false,
         "session_detections": 0,
-        "cooldown_until": 1779151342.176091,
+        "cooldown_until": null,
         "last_detection": "2026-05-18T17:40:22.289110"
       }
     },

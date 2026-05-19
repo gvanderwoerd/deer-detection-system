@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CAMERA_CONFIG = {
     "detection_config": {
         "enabled_objects": {
+            "person": True,
             "cat": True,
             "dog": True,
             "horse": True,
