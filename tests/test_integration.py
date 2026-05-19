@@ -300,7 +300,7 @@ class TestAPIHealthCheck:
         pass
 
 
-# Run tests with: pytest server/test_integration.py -v
+# Run tests with: pytest tests/test_integration.py -v
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
