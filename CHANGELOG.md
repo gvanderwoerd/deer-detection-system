@@ -1,5 +1,29 @@
 # Deer Detection System - Changelog
 
+## 2026-05-18 - Synchronized Footer Counters (Live Stream Timing Fix)
+
+### Footer Counter Synchronization (FIX)
+- ✅ Fixed timing mismatch between footer duration counter and actual device operation
+- ✅ Root cause: Client was calculating remaining time from session start, but device activates after session starts
+- ✅ Duration counter was reaching 0 several seconds before device actually turned off
+- ✅ Solution: Server now calculates and sends actual remaining times (`device_remaining`, `session_remaining_seconds`)
+- ✅ Client uses server values directly instead of independent calculation
+- ✅ All three counters (Active, Cooldown, Duration) now display exact server state
+
+### Implementation Details
+- Added `device_activated_at` tracking in Camera class to know exact activation timestamp
+- Server calculates: `device_remaining = device_activated_at + device_duration - current_time`
+- Client locally decrements for smooth display, re-syncs with server updates
+- Pattern: Server is single source of truth, client displays + smoothly decrements
+
+### Files Modified
+- `server/camera_manager.py` - Device activation timestamp tracking
+- `server/main.py` - API sends `device_remaining` in status response
+- `web/app.js` - Counters use server values instead of local calculations
+- `web/style.css` - Added multi-line footer styling
+
+---
+
 ## 2026-03-14 - Cloud API Resilience & UI Robustness
 
 ### Enhanced Animal Detection (NEW)

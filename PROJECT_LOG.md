@@ -3,6 +3,7 @@
 **Status:** ✅ Fully Operational
 **Last Updated:** 2026-05-18
 **Framework Version:** Phase 1-4 Complete (Sprinkler Control Reliability Framework)
+**Latest Bookmark:** Synchronized Footer Counters (Commit 50dce80)
 
 ---
 
@@ -52,6 +53,57 @@ Automated animal detection system that activates SmartLife valves to deter anima
 ---
 
 ## Recent Updates
+
+### 2026-05-18: Synchronized Footer Counters (Commit 50dce80)
+
+**Fixed Timing Mismatch Between Display and Actual Device Operation**
+
+#### Problem
+Duration counter on live stream footer was reaching zero several seconds before the device actually turned off. Root cause: client was calculating remaining time based on `session_elapsed_seconds` (time since session start) instead of using the server's actual device activation time.
+
+#### Root Cause Analysis
+- **Three independent timings** in the system:
+  1. **Duration** = device activation time (how long sprinkler stays on) - 10 seconds
+  2. **Active** = active_window_seconds (how long system monitors for detections) - 60 seconds  
+  3. **Cooldown** = cooldown_period_seconds (lockout between sessions) - 120 seconds
+
+- **The mismatch**: Duration counter was using `duration - session_elapsed_seconds`, but device activates AFTER session starts, causing drift
+- **Result**: Counter hit 0 at T=10s while device actually turned off at T=10.5s (network delay)
+
+#### Solution
+Made counters use server's actual remaining times instead of client-side calculations:
+
+1. **Server-side tracking**:
+   - Added `device_activated_at` timestamp in Camera class
+   - Calculates `device_remaining = activation_time + duration - current_time`
+   - Sends `device_remaining` in status API (matching `session_remaining_seconds` and `cooldown_remaining`)
+
+2. **Client-side display**:
+   - Footer now uses `device_remaining` directly from server
+   - Active counter uses `session_remaining_seconds` (already correct)
+   - Cooldown uses `cooldown_period_seconds` (static value from config)
+   - All three counters now reflect server's actual state
+
+3. **Smooth countdown**:
+   - Client locally decrements server values between updates (1s interval)
+   - Keeps display smooth and responsive
+   - Resynchronizes on each server update
+
+#### Files Modified
+- `server/camera_manager.py` - Added device activation timestamp tracking
+- `server/main.py` - Calculate and send `device_remaining` in status response
+- `web/app.js` - Use server values directly instead of local calculations
+- `web/style.css` - Added `.footer-line` styling for multi-line footer
+
+#### Testing
+- Duration counter now reaches 0 exactly when device turns off
+- No more desync between visual countdown and actual device timing
+- Counters accurately reflect server's active session and device status
+
+#### Key Learning
+**Client and server should never be independent sources of truth for timing.** Server calculates actual remaining times; client displays and decrements locally for responsiveness but always respects server updates. Three separate counters need three separate server-calculated values.
+
+---
 
 ### 2026-05-18: Sprinkler Control Reliability Framework (Commits 04edbc6, 76662d5, 0109059)
 
