@@ -3,7 +3,7 @@
 **Status:** ✅ Fully Operational
 **Last Updated:** 2026-05-18
 **Framework Version:** Phase 1-4 Complete (Sprinkler Control Reliability Framework)
-**Latest Bookmark:** Synchronized Footer Counters (Commit 50dce80)
+**Latest Bookmark:** Code & File Bloat Cleanup - Quick Wins (Commit b5ae8ed)
 
 ---
 
@@ -53,6 +53,53 @@ Automated animal detection system that activates SmartLife valves to deter anima
 ---
 
 ## Recent Updates
+
+### 2026-05-18: Code & File Bloat Cleanup - Quick Wins (Commits 3bb0757, 296fb27, b5ae8ed)
+
+**Three Quick-Win Cleanups to Improve Code Organization & Maintainability**
+
+#### 1. Test File Organization (Commit 3bb0757)
+Moved test files from `server/` to dedicated `tests/` directory for better project structure.
+
+- **Moved:** `server/test_tuya.py` → `tests/test_tuya.py`
+- **Moved:** `server/test_integration.py` → `tests/test_integration.py`
+- **Cleaned:** Removed orphaned `.pytest_cache` from server/
+- **Updated:** pytest command in test_integration.py to reflect new location
+- **Status:** Test files remain unused in production (safe to move)
+- **Impact:** Reduced clutter in server/ directory, improved project organization
+
+#### 2. Remove Unused Imports (Commit 296fb27)
+Removed 4 unused imports from `server/main.py` identified through code analysis.
+
+**Removed imports:**
+- `import requests` - Used by valve_control_cloud and device_manager, not main.py
+- `import numpy as np` - Unused (cv2 handles all image operations)
+- `from model_recommendation import ModelRecommender` - Only `get_model_recommendation_api` used
+- `from config import ESP32_CAM_STREAM_URL` - Unused configuration constant
+
+**Impact:** Cleaner imports, reduced dependency footprint
+**Verified:** main.py imports successfully, all functionality preserved
+
+#### 3. Update Documentation (Commit b5ae8ed)
+Updated CODE_BLOAT_ANALYSIS.md to reflect completed cleanup work.
+
+- Marked test file reorganization as complete
+- Marked unused import removal as complete
+- Updated all file references from `server/test_*.py` to `tests/test_*.py`
+
+#### Summary
+- **Lines saved:** ~10 lines in main.py
+- **Files organized:** 2 test files moved
+- **Documentation:** Updated to track completion
+- **System status:** All changes verified, no breakage
+
+#### Next Steps (From Analysis)
+Medium-effort items for future consideration:
+- Consolidate 6 HTML pages → Single-page app or template system (~500-700 lines)
+- Split main.py into modular routes/ structure (maintainability improvement)
+- Consolidate JavaScript apiCall() usage (app.js vs api-client.js)
+
+---
 
 ### 2026-05-18: Synchronized Footer Counters (Commit 50dce80)
 
