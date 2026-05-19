@@ -105,7 +105,7 @@ async function startCamera() {
         // Trigger detection on selected camera
         console.log(`[CAMERA] Calling /cameras/${targetCameraId}/trigger`);
         const result = await apiCall(`/cameras/${targetCameraId}/trigger`, 'POST');
-        console.log(`[CAMERA] API response:`, result);
+        console.log(`[CAMERA] API response:`, JSON.stringify(result));
 
         if (result.success !== false) {
             cameraActive = true;
@@ -140,8 +140,10 @@ async function startCamera() {
 
             addLogEntry('camera', 'Camera feed active');
         } else {
-            console.log(`[CAMERA] API call failed:`, result);
-            addLogEntry('error', result.message || 'Failed to trigger camera');
+            console.log(`[CAMERA] API call failed:`, JSON.stringify(result));
+            const errorMsg = result.error || result.message || 'Failed to trigger camera';
+            console.log(`[CAMERA] Error: ${errorMsg}`);
+            addLogEntry('error', errorMsg);
         }
     } catch (error) {
         console.error('[CAMERA] Exception in startCamera:', error);
