@@ -324,6 +324,9 @@ class CameraManager {
                                 value="${duration}"
                                 ${!isAssigned ? 'disabled' : ''}
                             /> seconds
+                            <small style="display: block; margin-top: 3px; color: #999; font-size: 0.85em;">
+                                How long to keep this device active when triggered (e.g., sprinkler run time)
+                            </small>
                         </div>
                     </label>
                 </div>
