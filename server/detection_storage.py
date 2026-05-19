@@ -155,8 +155,19 @@ class DetectionStorage:
             # Per-camera gallery
             metadata = self._load_camera_metadata(camera_id)
         else:
-            # Legacy: use in-memory metadata from default camera
-            metadata = self.metadata
+            # All cameras: aggregate from all camera subdirectories
+            metadata = []
+            try:
+                for camera_subdir in DETECTIONS_DIR.iterdir():
+                    if camera_subdir.is_dir():
+                        camera_metadata = self._load_camera_metadata(camera_subdir.name)
+                        # Add camera_id to each detection for display purposes
+                        for detection in camera_metadata:
+                            detection['camera_id'] = camera_subdir.name
+                        metadata.extend(camera_metadata)
+            except Exception as e:
+                logger.error(f"Error loading all camera detections: {e}")
+                metadata = self.metadata  # Fallback to legacy
 
         # Sort by timestamp (newest first)
         sorted_detections = sorted(
@@ -181,7 +192,16 @@ class DetectionStorage:
         if camera_id:
             metadata = self._load_camera_metadata(camera_id)
         else:
-            metadata = self.metadata
+            # All cameras: aggregate from all camera subdirectories
+            metadata = []
+            try:
+                for camera_subdir in DETECTIONS_DIR.iterdir():
+                    if camera_subdir.is_dir():
+                        camera_metadata = self._load_camera_metadata(camera_subdir.name)
+                        metadata.extend(camera_metadata)
+            except Exception as e:
+                logger.error(f"Error loading all camera stats: {e}")
+                metadata = self.metadata  # Fallback to legacy
 
         if not metadata:
             return {

@@ -11,23 +11,20 @@
       "last_seen": null,
       "position": 0,
       "detection_config": {
+        "confidence_threshold": 0.25,
         "enabled_objects": {
           "cat": true,
           "dog": true,
           "horse": true,
           "sheep": true,
           "cow": true,
-          "elephant": true,
-          "bear": true,
-          "zebra": true,
-          "giraffe": true
+          "bear": true
         },
-        "confidence_threshold": 0.25,
         "save_person_detections": false
       },
       "device_assignments": [
         {
-          "device_id": "eb2f5498a4e53362f5lumi",
+          "device_id": "ebb0a0a4392ad1513ddo5n",
           "duration_seconds": 120
         }
       ],
@@ -41,7 +38,7 @@
         "session_active": false,
         "session_detections": 0,
         "cooldown_until": null,
-        "last_detection": "2026-05-18T16:34:09.074833"
+        "last_detection": "2026-05-18T17:11:31.168214"
       }
     },
     {
