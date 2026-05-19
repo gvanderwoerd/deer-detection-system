@@ -636,25 +636,15 @@ function updateCameraFooter(cameraId, statusData) {
     let footerHtml = '';
 
     if (statusData.session_active) {
-        const elapsed = Math.floor(statusData.session_elapsed_seconds || 0);
-        const remaining = Math.floor(Math.max(0, (statusData.active_window_seconds || 60) - elapsed));
-        const detections = statusData.session_detections || 0;
-
-        // Initialize device duration countdown if not already started
-        if (!cameraDeviceDurations[cameraId]) {
-            const durations = statusData.device_durations || [];
-            cameraDeviceDurations[cameraId] = durations.length > 0 ? durations[0] : 0;
-        }
-
-        const durationRemaining = Math.max(0, cameraDeviceDurations[cameraId] - elapsed);
-        const durationText = cameraDeviceDurations[cameraId] > 0
-            ? `Duration: ${Math.floor(durationRemaining)}s`
-            : 'Duration: Not configured';
+        const activeRemaining = Math.floor(statusData.session_remaining_seconds || 0);
+        const cooldownPeriod = statusData.cooldown_period_seconds || 120;
+        const deviceRemaining = Math.floor(statusData.device_remaining || 0);
 
         footerHtml = `
             <div class="footer-status active">
-                <div class="footer-timer">🟢 ACTIVE: ${remaining}s</div>
-                <div class="footer-info">${durationText}</div>
+                <div class="footer-line">🟢 Active: ${activeRemaining}s</div>
+                <div class="footer-line">⏳ Cooldown: ${cooldownPeriod}s</div>
+                <div class="footer-line">⏱️ Duration: ${deviceRemaining > 0 ? deviceRemaining + 's' : 'N/A'}</div>
             </div>
         `;
     } else if (statusData.cooldown_remaining > 0) {
@@ -708,29 +698,27 @@ function startCountdownTimer(cameraId) {
             return;
         }
 
-        // Decrement timers locally
+        // Decrement server values locally for smooth display
         if (statusData.session_active) {
-            statusData.session_elapsed_seconds = (statusData.session_elapsed_seconds || 0) + 1;
-            const remaining = Math.floor(Math.max(0, (statusData.active_window_seconds || 60) - statusData.session_elapsed_seconds));
+            // Decrement remaining times (from server)
+            statusData.session_remaining_seconds = Math.max(0, (statusData.session_remaining_seconds || 0) - 1);
+            statusData.device_remaining = Math.max(0, (statusData.device_remaining || 0) - 1);
 
-            if (remaining <= 0) {
+            const activeRemaining = Math.floor(statusData.session_remaining_seconds);
+            const cooldownPeriod = statusData.cooldown_period_seconds || 120;
+            const deviceRemaining = Math.floor(statusData.device_remaining);
+
+            if (activeRemaining <= 0) {
                 // Session ended, will fetch new status next poll
                 statusData.session_active = false;
                 statusData.cooldown_remaining = statusData.cooldown_period_seconds || 120;
-                delete cameraDeviceDurations[cameraId];
             }
-
-            // Calculate remaining device duration
-            const initialDuration = cameraDeviceDurations[cameraId] || 0;
-            const durationRemaining = Math.floor(Math.max(0, initialDuration - statusData.session_elapsed_seconds));
-            const durationText = initialDuration > 0
-                ? `Duration: ${durationRemaining}s`
-                : 'Duration: Not configured';
 
             footerElement.innerHTML = `
                 <div class="footer-status active">
-                    <div class="footer-timer">🟢 ACTIVE: ${remaining}s</div>
-                    <div class="footer-info">${durationText}</div>
+                    <div class="footer-line">🟢 Active: ${activeRemaining}s</div>
+                    <div class="footer-line">⏳ Cooldown: ${cooldownPeriod}s</div>
+                    <div class="footer-line">⏱️ Duration: ${deviceRemaining > 0 ? deviceRemaining + 's' : 'N/A'}</div>
                 </div>
             `;
         } else if (statusData.cooldown_remaining > 0) {

@@ -91,6 +91,10 @@ class Camera:
         self.session_start = None
         self.detector = None  # Will be set by CameraManager
 
+        # Device activation tracking
+        self.device_activated_at = None
+        self.device_duration = None
+
     def trigger_detection(self) -> bool:
         """Trigger a detection session on this camera"""
         now = time.time()
@@ -594,6 +598,8 @@ class CameraManager:
                                             try:
                                                 logger.info(f"💨 [{camera.name}] Calling turn_on({device_id}, duration={duration})")
                                                 dm.turn_on(device_id, duration=duration)
+                                                camera.device_activated_at = time.time()
+                                                camera.device_duration = duration
                                                 logger.info(f"✅ [{camera.name}] Device {device_id} activated for {duration}s")
                                             except Exception as e:
                                                 logger.error(f"❌ [{camera.name}] Failed to activate device {device_id}: {e}")

@@ -718,6 +718,14 @@ def api_camera_detection_status(camera_id):
     else:
         response['cooldown_remaining'] = 0
 
+    # Calculate device remaining time
+    if camera.device_activated_at and camera.device_duration:
+        now = time.time()
+        device_remaining = max(0, camera.device_activated_at + camera.device_duration - now)
+        response['device_remaining'] = device_remaining
+    else:
+        response['device_remaining'] = 0
+
     return jsonify(response)
 
 

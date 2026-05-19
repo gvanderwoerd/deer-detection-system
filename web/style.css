@@ -627,6 +627,11 @@ footer {
     opacity: 1;
 }
 
+.footer-line {
+    font-weight: bold;
+    font-size: 0.95rem;
+}
+
 .footer-status.active {
     background-color: rgba(0, 200, 83, 0.15);
     color: var(--accent-success);
