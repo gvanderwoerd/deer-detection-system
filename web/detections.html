@@ -497,16 +497,27 @@
                 ...cameras.map(c => ({ id: c.id, name: `🎥 ${c.name}` }))
             ];
 
-            tabsContainer.innerHTML = tabs.map(tab => `
+            tabsContainer.innerHTML = tabs.map((tab, index) => `
                 <button class="camera-tab ${currentCamera === tab.id ? 'active' : ''}"
-                        onclick="selectCamera('${tab.id}')">
+                        data-camera-id="${tab.id === null ? 'ALL' : tab.id}"
+                        onclick="selectCamera(event)">
                     ${tab.name}
                 </button>
             `).join('');
+
+            // Add event listeners to prevent string conversion of null
+            document.querySelectorAll('.camera-tab').forEach((btn, index) => {
+                btn.addEventListener('click', function() {
+                    selectCamera(event);
+                });
+            });
         }
 
-        function selectCamera(cameraId) {
-            currentCamera = cameraId;
+        function selectCamera(event) {
+            const button = event.currentTarget;
+            const cameraIdAttr = button.getAttribute('data-camera-id');
+            // Convert 'ALL' back to null for "All Cameras" tab
+            currentCamera = cameraIdAttr === 'ALL' ? null : cameraIdAttr;
             renderCameraFilterTabs();
             loadDetections();
         }
@@ -514,10 +525,13 @@
         async function loadDetections() {
             try {
                 let url = '/api/detections?limit=100';
-                if (currentCamera) {
-                    url += `&camera_id=${currentCamera}`;
+                // Only add camera_id parameter if currentCamera is NOT null
+                // When currentCamera is null, it means "All Cameras" and we don't pass camera_id
+                if (currentCamera !== null && currentCamera !== undefined) {
+                    url += `&camera_id=${encodeURIComponent(currentCamera)}`;
                 }
 
+                console.log('Loading detections from:', url);
                 const response = await fetch(url);
                 const data = await response.json();
 
@@ -525,6 +539,7 @@
                     allDetections = data.detections;
                     displayDetections(data.detections);
                     updateStats(data.stats);
+                    console.log(`Loaded ${data.detections.length} detections`);
                 } else {
                     console.error('Failed to load detections:', data.error);
                     document.getElementById('gallery').innerHTML =
@@ -711,7 +726,8 @@
 
             try {
                 const body = { filter: filter };
-                if (currentCamera) {
+                // Only add camera_id if we're viewing a specific camera (not "All Cameras")
+                if (currentCamera !== null && currentCamera !== undefined) {
                     body.camera_id = currentCamera;
                 }
 
