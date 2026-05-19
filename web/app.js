@@ -81,55 +81,71 @@ let cameraCountdownIntervals = {};  // Store countdown intervals for each camera
 
 // Camera control functions
 async function startCamera() {
-    if (cameraActive) return;  // Already active
+    try {
+        console.log('[CAMERA] startCamera() called');
 
-    // Use selected camera if available, otherwise use first camera
-    const targetCameraId = selectedCameraId || (availableCameras.length > 0 ? availableCameras[0].id : null);
-
-    if (!targetCameraId) {
-        addLogEntry('error', 'No camera selected or available');
-        return;
-    }
-
-    addLogEntry('camera', `Activating live camera feed (${selectedCameraId ? 'selected' : 'default'})...`);
-
-    // Trigger detection on selected camera
-    const result = await apiCall(`/cameras/${targetCameraId}/trigger`, 'POST');
-
-    if (result.success !== false) {
-        cameraActive = true;
-        console.log(`[CAMERA] Detection triggered for camera: ${targetCameraId}`);
-
-        if (elements.btnToggleCamera) {
-            elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
-            elements.btnToggleCamera.classList.remove('btn-secondary');
-            elements.btnToggleCamera.classList.add('btn-warning');
-        }
-        if (elements.noFeedMessage) {
-            elements.noFeedMessage.style.display = 'none';
+        if (cameraActive) {
+            console.log('[CAMERA] Already active, returning');
+            return;  // Already active
         }
 
-        // Start fetching per-camera status
-        if (cameraStatusInterval) {
-            clearInterval(cameraStatusInterval);
+        // Use selected camera if available, otherwise use first camera
+        const targetCameraId = selectedCameraId || (availableCameras.length > 0 ? availableCameras[0].id : null);
+
+        console.log(`[CAMERA] Target camera ID: ${targetCameraId}, selectedCameraId: ${selectedCameraId}, availableCameras: ${availableCameras.length}`);
+
+        if (!targetCameraId) {
+            console.log('[CAMERA] No target camera ID');
+            addLogEntry('error', 'No camera selected or available');
+            return;
         }
-        cameraStatusInterval = setInterval(() => {
-            if (cameraActive && targetCameraId) {
-                fetchCameraStatus(targetCameraId);
+
+        addLogEntry('camera', `Activating live camera feed (${selectedCameraId ? 'selected' : 'default'})...`);
+
+        // Trigger detection on selected camera
+        console.log(`[CAMERA] Calling /cameras/${targetCameraId}/trigger`);
+        const result = await apiCall(`/cameras/${targetCameraId}/trigger`, 'POST');
+        console.log(`[CAMERA] API response:`, result);
+
+        if (result.success !== false) {
+            cameraActive = true;
+            console.log(`[CAMERA] Detection triggered for camera: ${targetCameraId}`);
+
+            if (elements.btnToggleCamera) {
+                elements.btnToggleCamera.textContent = '⏹️ Stop Camera';
+                elements.btnToggleCamera.classList.remove('btn-secondary');
+                elements.btnToggleCamera.classList.add('btn-warning');
             }
-        }, 1000);  // Update every second for live timers
-        console.log(`[CAMERA] Status polling started for camera: ${targetCameraId}`);
-
-        // Keep camera alive by polling status
-        cameraKeepAliveInterval = setInterval(() => {
-            if (cameraActive) {
-                pollStatus();
+            if (elements.noFeedMessage) {
+                elements.noFeedMessage.style.display = 'none';
             }
-        }, 3000);
 
-        addLogEntry('camera', 'Camera feed active');
-    } else {
-        addLogEntry('error', result.message || 'Failed to trigger camera');
+            // Start fetching per-camera status
+            if (cameraStatusInterval) {
+                clearInterval(cameraStatusInterval);
+            }
+            cameraStatusInterval = setInterval(() => {
+                if (cameraActive && targetCameraId) {
+                    fetchCameraStatus(targetCameraId);
+                }
+            }, 1000);  // Update every second for live timers
+            console.log(`[CAMERA] Status polling started for camera: ${targetCameraId}`);
+
+            // Keep camera alive by polling status
+            cameraKeepAliveInterval = setInterval(() => {
+                if (cameraActive) {
+                    pollStatus();
+                }
+            }, 3000);
+
+            addLogEntry('camera', 'Camera feed active');
+        } else {
+            console.log(`[CAMERA] API call failed:`, result);
+            addLogEntry('error', result.message || 'Failed to trigger camera');
+        }
+    } catch (error) {
+        console.error('[CAMERA] Exception in startCamera:', error);
+        addLogEntry('error', `Camera error: ${error.message}`);
     }
 }
 
