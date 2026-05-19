@@ -37,8 +37,8 @@
         "online": true,
         "session_active": false,
         "session_detections": 0,
-        "cooldown_until": null,
-        "last_detection": "2026-05-18T17:11:31.168214"
+        "cooldown_until": 1779151342.176091,
+        "last_detection": "2026-05-18T17:40:22.289110"
       }
     },
     {

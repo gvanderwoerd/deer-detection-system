@@ -98,9 +98,21 @@
 
                     <h3>Camera Controls</h3>
 
-                    <button id="btn-toggle-camera" class="btn btn-secondary btn-large">
-                        📹 View Live Camera
-                    </button>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <select id="camera-selector" style="flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #ccc; background: white; color: #333; font-size: 14px;">
+                            <option value="">Select a camera...</option>
+                        </select>
+                        <button id="btn-toggle-camera" class="btn btn-secondary" style="flex: 1;">
+                            📹 View Selected Camera
+                        </button>
+                    </div>
+
+                    <!-- Per-Camera Status Display -->
+                    <div id="camera-status-panel" style="background: #f5f5f5; border-radius: 5px; padding: 15px; margin-bottom: 15px; display: none;">
+                        <div id="camera-status-content">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
 
                     <button onclick="window.location.href='/cameras'" class="btn btn-info btn-large">
                         🎥 Manage Cameras

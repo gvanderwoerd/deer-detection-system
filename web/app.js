@@ -59,7 +59,12 @@ function initElements() {
         btnStopSprinkler: document.getElementById('btn-stop-sprinkler'),
         btnTestSprinkler: document.getElementById('btn-test-sprinkler'),
         btnTriggerMotion: document.getElementById('btn-trigger-motion'),
-        btnCloudSync: document.getElementById('btn-cloud-sync')
+        btnCloudSync: document.getElementById('btn-cloud-sync'),
+
+        // Per-camera controls
+        cameraSelector: document.getElementById('camera-selector'),
+        cameraStatusPanel: document.getElementById('camera-status-panel'),
+        cameraStatusContent: document.getElementById('camera-status-content')
     };
     console.log('[DEBUG] UI Elements initialized');
 }
@@ -68,13 +73,26 @@ function initElements() {
 let cameraActive = false;
 let cameraKeepAliveInterval = null;
 let previousMotionActive = false;  // Track previous motion state for auto-start
+let selectedCameraId = null;  // Track selected camera for per-camera control
+let availableCameras = [];  // List of available cameras
+let cameraStatusInterval = null;  // Interval for polling camera status
 
 // Camera control functions
 async function startCamera() {
     if (cameraActive) return;  // Already active
 
-    addLogEntry('camera', 'Activating live camera feed...');
-    const result = await apiCall('/trigger', 'POST');
+    // Use selected camera if available, otherwise use first camera
+    const targetCameraId = selectedCameraId || (availableCameras.length > 0 ? availableCameras[0].id : null);
+
+    if (!targetCameraId) {
+        addLogEntry('error', 'No camera selected or available');
+        return;
+    }
+
+    addLogEntry('camera', `Activating live camera feed (${selectedCameraId ? 'selected' : 'default'})...`);
+
+    // Trigger detection on selected camera
+    const result = await apiCall(`/cameras/${targetCameraId}/trigger`, 'POST');
 
     if (result.success !== false) {
         cameraActive = true;
@@ -87,6 +105,16 @@ async function startCamera() {
             elements.noFeedMessage.style.display = 'none';
         }
 
+        // Start fetching per-camera status
+        if (cameraStatusInterval) {
+            clearInterval(cameraStatusInterval);
+        }
+        cameraStatusInterval = setInterval(() => {
+            if (cameraActive && targetCameraId) {
+                fetchCameraStatus(targetCameraId);
+            }
+        }, 1000);  // Update every second for live timers
+
         // Keep camera alive by polling status
         cameraKeepAliveInterval = setInterval(() => {
             if (cameraActive) {
@@ -95,6 +123,8 @@ async function startCamera() {
         }, 3000);
 
         addLogEntry('camera', 'Camera feed active');
+    } else {
+        addLogEntry('error', result.message || 'Failed to trigger camera');
     }
 }
 
@@ -111,6 +141,16 @@ function stopCamera() {
     if (cameraKeepAliveInterval) {
         clearInterval(cameraKeepAliveInterval);
         cameraKeepAliveInterval = null;
+    }
+
+    if (cameraStatusInterval) {
+        clearInterval(cameraStatusInterval);
+        cameraStatusInterval = null;
+    }
+
+    // Clear per-camera status display
+    if (elements.cameraStatusPanel) {
+        elements.cameraStatusPanel.style.display = 'none';
     }
 
     addLogEntry('camera', 'Camera feed stopped');
@@ -170,6 +210,44 @@ function connectWebSocket() {
 
         socket.on('motion_status', (data) => {
             handleMotionStatus(data);
+        });
+
+        socket.on('camera_detection_status', (data) => {
+            // Real-time per-camera detection status updates
+            if (data.camera_id === selectedCameraId && cameraActive) {
+                console.log('[DEBUG] Per-camera detection status update:', data);
+                // Update status display immediately without refetch
+                if (elements.cameraStatusContent) {
+                    const camera = availableCameras.find(c => c.id === data.camera_id);
+                    const cameraName = camera ? camera.name : data.camera_id;
+
+                    let statusHtml = `<strong>${cameraName}</strong><br>`;
+
+                    if (data.session_active) {
+                        const elapsed = data.session_elapsed_seconds || 0;
+                        const remaining = Math.max(0, (data.active_window_seconds || 60) - elapsed);
+                        const detections = data.session_detections || 0;
+
+                        statusHtml += `<div style="color: #4CAF50;">
+                            <strong>🟢 DETECTION ACTIVE</strong><br>
+                            Remaining: <strong>${remaining}s</strong><br>
+                            Detections: <strong>${detections}</strong>
+                        </div>`;
+                    } else if (data.cooldown_remaining > 0) {
+                        statusHtml += `<div style="color: #ffa726;">
+                            <strong>⏳ COOLDOWN</strong><br>
+                            Remaining: <strong>${data.cooldown_remaining}s</strong>
+                        </div>`;
+                    } else {
+                        statusHtml += `<div style="color: #999;">
+                            <strong>⚪ IDLE</strong><br>
+                            Ready for detection
+                        </div>`;
+                    }
+
+                    elements.cameraStatusContent.innerHTML = statusHtml;
+                }
+            }
         });
     } catch (error) {
         console.error('[DEBUG] ❌ WebSocket initialization error:', error);
@@ -417,11 +495,97 @@ async function apiCall(endpoint, method = 'GET', data = null) {
     }
 }
 
+// Load available cameras and populate selector
+async function loadCameras() {
+    try {
+        const result = await apiCall('/cameras');
+        if (result.success !== false && result.cameras) {
+            availableCameras = result.cameras;
+
+            if (elements.cameraSelector) {
+                // Clear existing options except first
+                elements.cameraSelector.innerHTML = '<option value="">Select a camera...</option>';
+
+                // Add camera options
+                availableCameras.forEach(camera => {
+                    const option = document.createElement('option');
+                    option.value = camera.id;
+                    option.textContent = camera.name;
+                    elements.cameraSelector.appendChild(option);
+                });
+
+                // Auto-select first camera
+                if (availableCameras.length > 0) {
+                    selectedCameraId = availableCameras[0].id;
+                    elements.cameraSelector.value = selectedCameraId;
+                    console.log('[DEBUG] Auto-selected camera:', selectedCameraId);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load cameras:', error);
+    }
+}
+
+// Fetch and display per-camera detection status
+async function fetchCameraStatus(cameraId) {
+    try {
+        const result = await apiCall(`/cameras/${cameraId}/detection/status`);
+
+        if (result.success !== false && elements.cameraStatusPanel) {
+            elements.cameraStatusPanel.style.display = 'block';
+
+            if (elements.cameraStatusContent) {
+                // Get camera name
+                const camera = availableCameras.find(c => c.id === cameraId);
+                const cameraName = camera ? camera.name : cameraId;
+
+                // Calculate remaining time
+                let statusHtml = `<strong>${cameraName}</strong><br>`;
+
+                if (result.session_active) {
+                    const elapsed = result.session_elapsed_seconds || 0;
+                    const remaining = Math.max(0, (result.active_window_seconds || 60) - elapsed);
+                    const detections = result.session_detections || 0;
+
+                    statusHtml += `<div style="color: #4CAF50;">
+                        <strong>🟢 DETECTION ACTIVE</strong><br>
+                        Remaining: <strong>${remaining}s</strong><br>
+                        Detections: <strong>${detections}</strong>
+                    </div>`;
+                } else if (result.cooldown_remaining > 0) {
+                    statusHtml += `<div style="color: #ffa726;">
+                        <strong>⏳ COOLDOWN</strong><br>
+                        Remaining: <strong>${result.cooldown_remaining}s</strong>
+                    </div>`;
+                } else {
+                    statusHtml += `<div style="color: #999;">
+                        <strong>⚪ IDLE</strong><br>
+                        Ready for detection
+                    </div>`;
+                }
+
+                elements.cameraStatusContent.innerHTML = statusHtml;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to fetch camera status:', error);
+    }
+}
+
 // Button event handlers
 function setupEventListeners() {
     if (!elements.btnEnable) {
         console.error('btnEnable missing from elements');
         return;
+    }
+
+    // Camera selector change
+    if (elements.cameraSelector) {
+        elements.cameraSelector.addEventListener('change', (e) => {
+            selectedCameraId = e.target.value;
+            console.log('[DEBUG] Camera selected:', selectedCameraId);
+        });
     }
 
     elements.btnEnable.addEventListener('click', async () => {
@@ -813,11 +977,17 @@ document.addEventListener('DOMContentLoaded', () => {
         updateHealthPanel();
     } catch (e) { console.error('Step 4/5 failed:', e); }
 
+    // Load cameras for per-camera controls
+    try {
+        console.log('[DEBUG] Step 6: Loading cameras...');
+        loadCameras();
+    } catch (e) { console.error('Step 6 failed:', e); }
+
     // Initialize multi-camera grid
     try {
-        console.log('[DEBUG] Step 6: Initializing camera grid...');
+        console.log('[DEBUG] Step 7: Initializing camera grid...');
         initCameraGrid();
-    } catch (e) { console.error('Step 6 failed:', e); }
+    } catch (e) { console.error('Step 7 failed:', e); }
 
     console.log('[DEBUG] ========================================');
     console.log('[DEBUG] Initialization complete!');
