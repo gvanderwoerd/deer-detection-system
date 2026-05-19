@@ -12,22 +12,19 @@ from collections import deque
 from device_manager import get_device_manager
 from flask import Flask, Response, jsonify, request
 from flask_socketio import SocketIO, emit
-import requests
 import cv2
-import numpy as np
 import threading
 
 from detection import DeerDetector
 from valve_control_cloud import CloudValveController as ValveController
 from detection_storage import get_detection_storage
-from model_recommendation import ModelRecommender, get_model_recommendation_api
+from model_recommendation import get_model_recommendation_api
 from activation_metrics import get_metrics as get_activation_metrics
 from api_usage_tracker import get_tracker as get_api_tracker
 from camera_manager import get_camera_manager
 from config import (
     SERVER_HOST,
     SERVER_PORT,
-    ESP32_CAM_STREAM_URL,
     ACTIVE_WINDOW_SECONDS,
     SPRINKLER_DURATION_SECONDS,
     COOLDOWN_PERIOD_SECONDS,
