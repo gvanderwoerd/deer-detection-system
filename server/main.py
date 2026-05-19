@@ -692,15 +692,27 @@ def api_camera_detection_status(camera_id):
         'camera_name': camera.name,
         'session_active': camera.session_active,
         'session_detections': camera.session_detections,
-        'cooldown_until': camera.cooldown_until,
+        'active_window_seconds': camera.timing['active_window_seconds'],
+        'cooldown_period_seconds': camera.timing['cooldown_period_seconds'],
         'last_detection': camera.last_detection
     }
 
+    # Calculate session elapsed time if active
     if camera.session_active and camera.session_start:
         elapsed = time.time() - camera.session_start
         remaining = max(0, camera.timing['active_window_seconds'] - elapsed)
         response['session_elapsed_seconds'] = elapsed
         response['session_remaining_seconds'] = remaining
+    else:
+        response['session_elapsed_seconds'] = 0
+
+    # Calculate cooldown remaining time
+    if camera.cooldown_until:
+        now = time.time()
+        cooldown_remaining = max(0, camera.cooldown_until - now)
+        response['cooldown_remaining'] = cooldown_remaining
+    else:
+        response['cooldown_remaining'] = 0
 
     return jsonify(response)
 
