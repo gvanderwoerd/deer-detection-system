@@ -287,6 +287,11 @@ function connectWebSocket() {
 
 // Update connection status indicator
 function updateConnectionStatus(connected) {
+    if (!elements.connectionIndicator || !elements.connectionText) {
+        console.warn('[DEBUG] Connection status elements not found');
+        return;
+    }
+
     if (connected) {
         elements.connectionIndicator.textContent = '🟢';
         elements.connectionIndicator.className = 'indicator connected';
@@ -309,34 +314,40 @@ function updateStatus(status) {
     // (No longer shown in header since we have multiple cameras)
 
     // Last detection
-    if (status.last_detection) {
-        const date = new Date(status.last_detection);
-        // Format: March 25 2026 7:37:43 PM
-        const options = {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true
-        };
-        const formatted = date.toLocaleString('en-US', options).replace(',', '');
-        elements.lastDetection.textContent = formatted;
-    } else {
-        elements.lastDetection.textContent = 'Never';
+    if (elements.lastDetection) {
+        if (status.last_detection) {
+            const date = new Date(status.last_detection);
+            // Format: March 25 2026 7:37:43 PM
+            const options = {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            };
+            const formatted = date.toLocaleString('en-US', options).replace(',', '');
+            elements.lastDetection.textContent = formatted;
+        } else {
+            elements.lastDetection.textContent = 'Never';
+        }
     }
 
-    // Session info
-    elements.sessionDetections.textContent = status.session_detections || 0;
+    // Session info (legacy - may not exist in current UI)
+    if (elements.sessionDetections) {
+        elements.sessionDetections.textContent = status.session_detections || 0;
+    }
 
-    // Cooldown
-    if (status.cooldown_remaining > 0) {
-        elements.cooldownStatus.textContent = `${status.cooldown_remaining}s`;
-        elements.cooldownStatus.style.color = '#ffa726';
-    } else {
-        elements.cooldownStatus.textContent = 'None';
-        elements.cooldownStatus.style.color = '#00c853';
+    // Cooldown (legacy - may not exist in current UI)
+    if (elements.cooldownStatus) {
+        if (status.cooldown_remaining > 0) {
+            elements.cooldownStatus.textContent = `${status.cooldown_remaining}s`;
+            elements.cooldownStatus.style.color = '#ffa726';
+        } else {
+            elements.cooldownStatus.textContent = 'None';
+            elements.cooldownStatus.style.color = '#00c853';
+        }
     }
 
     // Update button states
@@ -877,6 +888,12 @@ async function pollStatus() {
 
 // Check video feed
 function checkVideoFeed() {
+    // Skip if video feed element doesn't exist (multi-camera mode)
+    if (!elements.videoFeed) {
+        console.log('[DEBUG] Video feed element not found (multi-camera mode)');
+        return;
+    }
+
     // Monitor when video feed starts/stops loading
     let frameReceived = false;
 
@@ -1156,10 +1173,18 @@ document.addEventListener('DOMContentLoaded', () => {
         socket.on('disconnect', () => { isSocketConnected = false; });
 
         // Poll only when WebSocket is disconnected (fallback mode)
+        let fallbackActive = false;
         setInterval(() => {
             if (!isSocketConnected) {
-                console.log('[FALLBACK] WebSocket disconnected, using HTTP polling');
+                if (!fallbackActive) {
+                    console.log('[FALLBACK] WebSocket disconnected, using HTTP polling');
+                    // Update connection status to show we're connected via polling
+                    updateConnectionStatus(true);
+                    fallbackActive = true;
+                }
                 pollStatus();
+            } else {
+                fallbackActive = false;
             }
         }, 5000);
 
