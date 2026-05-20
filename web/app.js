@@ -53,9 +53,6 @@ function initElements() {
         btnEnable: document.getElementById('btn-enable'),
         btnDisable: document.getElementById('btn-disable'),
         btnToggleCamera: document.getElementById('btn-toggle-camera'),
-        btnStopSprinkler: document.getElementById('btn-stop-sprinkler'),
-        btnTestSprinkler: document.getElementById('btn-test-sprinkler'),
-        btnTriggerMotion: document.getElementById('btn-trigger-motion'),
         btnCloudSync: document.getElementById('btn-cloud-sync'),
 
         // Per-camera controls
@@ -412,22 +409,6 @@ function updateButtonStates(status) {
             elements.btnEnable.disabled = false;
             elements.btnDisable.disabled = true;
         }
-    }
-
-    // Sprinkler controls (may not exist on all pages)
-    if (elements.btnStopSprinkler) {
-        const canControlSprinkler = status.valve_configured && isConnected;
-        elements.btnStopSprinkler.disabled = !canControlSprinkler;
-    }
-
-    if (elements.btnTestSprinkler) {
-        const canControlSprinkler = status.valve_configured && isConnected;
-        elements.btnTestSprinkler.disabled = !canControlSprinkler || status.valve_on;
-    }
-
-    // Manual trigger (may not exist on all pages)
-    if (elements.btnTriggerMotion) {
-        elements.btnTriggerMotion.disabled = !status.enabled || !isConnected;
     }
 }
 
@@ -821,40 +802,6 @@ function setupEventListeners() {
             stopCamera();
         }
     });
-
-    if (elements.btnStopSprinkler) {
-        elements.btnStopSprinkler.addEventListener('click', async () => {
-            if (confirm('Emergency stop sprinkler?')) {
-                addLogEntry('emergency', 'Emergency stop triggered');
-                const result = await apiCall('/sprinkler/off', 'POST');
-                if (!result.success) {
-                    addLogEntry('error', 'Failed to stop sprinkler');
-                }
-            }
-        });
-    }
-
-    if (elements.btnTestSprinkler) {
-        elements.btnTestSprinkler.addEventListener('click', async () => {
-            if (confirm('Test sprinkler for 10 seconds?')) {
-                addLogEntry('manual', 'Testing sprinkler (10s)');
-                const result = await apiCall('/sprinkler/on', 'POST', { duration: 10 });
-                if (!result.success) {
-                    addLogEntry('error', 'Failed to activate sprinkler');
-                }
-            }
-        });
-    }
-
-    if (elements.btnTriggerMotion) {
-        elements.btnTriggerMotion.addEventListener('click', async () => {
-            addLogEntry('manual', 'Manual motion trigger');
-            const result = await apiCall('/trigger', 'POST');
-            if (!result.success) {
-                addLogEntry('warning', result.message || 'Trigger ignored');
-            }
-        });
-    }
 
     if (elements.btnCloudSync) {
         elements.btnCloudSync.addEventListener('click', async () => {
