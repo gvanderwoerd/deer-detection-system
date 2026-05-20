@@ -404,21 +404,31 @@ function updateSystemState(state) {
 // Update button states based on system status
 function updateButtonStates(status) {
     // Enable/Disable buttons
-    if (status.enabled) {
-        elements.btnEnable.disabled = true;
-        elements.btnDisable.disabled = false;
-    } else {
-        elements.btnEnable.disabled = false;
-        elements.btnDisable.disabled = true;
+    if (elements.btnEnable && elements.btnDisable) {
+        if (status.enabled) {
+            elements.btnEnable.disabled = true;
+            elements.btnDisable.disabled = false;
+        } else {
+            elements.btnEnable.disabled = false;
+            elements.btnDisable.disabled = true;
+        }
     }
 
-    // Sprinkler controls
-    const canControlSprinkler = status.valve_configured && isConnected;
-    elements.btnStopSprinkler.disabled = !canControlSprinkler;
-    elements.btnTestSprinkler.disabled = !canControlSprinkler || status.valve_on;
+    // Sprinkler controls (may not exist on all pages)
+    if (elements.btnStopSprinkler) {
+        const canControlSprinkler = status.valve_configured && isConnected;
+        elements.btnStopSprinkler.disabled = !canControlSprinkler;
+    }
 
-    // Manual trigger
-    elements.btnTriggerMotion.disabled = !status.enabled || !isConnected;
+    if (elements.btnTestSprinkler) {
+        const canControlSprinkler = status.valve_configured && isConnected;
+        elements.btnTestSprinkler.disabled = !canControlSprinkler || status.valve_on;
+    }
+
+    // Manual trigger (may not exist on all pages)
+    if (elements.btnTriggerMotion) {
+        elements.btnTriggerMotion.disabled = !status.enabled || !isConnected;
+    }
 }
 
 // Handle events from server
