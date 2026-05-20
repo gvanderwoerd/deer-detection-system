@@ -40,7 +40,6 @@ let elements = {};
 function initElements() {
     elements = {
         systemStatus: document.getElementById('system-status'),
-        valveStatus: document.getElementById('valve-status'),
         lastDetection: document.getElementById('last-detection'),
         sessionDetections: document.getElementById('session-detections'),
         cooldownStatus: document.getElementById('cooldown-status'),
@@ -49,8 +48,6 @@ function initElements() {
         connectionText: document.getElementById('connection-text'),
         videoFeed: document.getElementById('video-feed'),
         noFeedMessage: document.getElementById('no-feed-message'),
-        pirStatus: document.getElementById('pir-status'),
-        wifiSignal: document.getElementById('wifi-signal'),
 
         // Buttons
         btnEnable: document.getElementById('btn-enable'),
@@ -308,49 +305,8 @@ function updateStatus(status) {
     // System state
     updateSystemState(status.state);
 
-    // Valve status
-    if (status.valve_api_error) {
-        elements.valveStatus.textContent = 'API Error';
-        elements.valveStatus.className = 'status-badge disabled';
-        elements.valveStatus.title = status.valve_api_error;
-    } else if (status.valve_on) {
-        elements.valveStatus.textContent = 'ON';
-        elements.valveStatus.className = 'status-badge enabled';
-        elements.valveStatus.title = '';
-    } else {
-        elements.valveStatus.textContent = 'OFF';
-        elements.valveStatus.className = 'status-badge disabled';
-        elements.valveStatus.title = '';
-    }
-
-    // WiFi signal strength
-    if (status.wifi_signal !== null && status.wifi_signal !== undefined) {
-        const rssi = status.wifi_signal;
-        let signalText, signalClass;
-
-        // RSSI ranges: -30 (excellent) to -90 (terrible)
-        if (rssi >= -50) {
-            signalText = 'Excellent';
-            signalClass = 'status-badge enabled';  // Green
-        } else if (rssi >= -60) {
-            signalText = 'Good';
-            signalClass = 'status-badge enabled';  // Green
-        } else if (rssi >= -70) {
-            signalText = 'Fair';
-            signalClass = 'status-badge active';  // Orange/Yellow
-        } else {
-            signalText = 'Poor';
-            signalClass = 'status-badge disabled';  // Red
-        }
-
-        elements.wifiSignal.textContent = `${signalText} (${rssi} dBm)`;
-        elements.wifiSignal.className = signalClass;
-        elements.wifiSignal.title = `Signal strength: ${rssi} dBm`;
-    } else {
-        elements.wifiSignal.textContent = '--';
-        elements.wifiSignal.className = 'status-badge disabled';
-        elements.wifiSignal.title = 'No signal data';
-    }
+    // Valve and WiFi status moved to per-camera display
+    // (No longer shown in header since we have multiple cameras)
 
     // Last detection
     if (status.last_detection) {
@@ -385,28 +341,35 @@ function updateStatus(status) {
 
     // Update button states
     updateButtonStates(status);
-
-    // Initial motion status
-    handleMotionStatus({ active: status.motion_active });
 }
 
-// Handle motion status updates
+// Handle motion status updates (per-camera)
 function handleMotionStatus(data) {
-    if (!elements.pirStatus) return;
+    // Update specific camera's PIR indicator
+    if (data.camera_id) {
+        const pirElement = document.getElementById(`pir-status-${data.camera_id}`);
+        if (pirElement) {
+            if (data.active) {
+                pirElement.textContent = 'PIR: MOTION';
+                pirElement.className = 'status-badge enabled';
+                pirElement.title = 'Motion detected';
+            } else {
+                pirElement.textContent = 'PIR: IDLE';
+                pirElement.className = 'status-badge disabled';
+                pirElement.title = 'No motion';
+            }
+        }
+    }
 
-    if (data.active) {
-        elements.pirStatus.textContent = 'MOTION DETECTED';
-        elements.pirStatus.className = 'status-badge enabled';
-
+    // Legacy: Handle motion without camera_id (for backwards compatibility)
+    if (!data.camera_id && data.active) {
         // Auto-start camera when motion detected (if not already active)
         if (!previousMotionActive && !cameraActive) {
             console.log('[AUTO-START] Motion detected, starting camera automatically...');
             startCamera();
         }
         previousMotionActive = true;
-    } else {
-        elements.pirStatus.textContent = 'NO MOTION';
-        elements.pirStatus.className = 'status-badge disabled';
+    } else if (!data.camera_id && !data.active) {
         previousMotionActive = false;
     }
 }
@@ -580,6 +543,9 @@ async function fetchCameraStatus(cameraId) {
             // Update camera card footer with countdown
             updateCameraFooter(cameraId, result);
 
+            // Update camera PIR and WiFi indicators
+            updateCameraIndicators(cameraId, result);
+
             // Update right panel if available
             if (elements.cameraStatusPanel) {
                 elements.cameraStatusPanel.style.display = 'block';
@@ -672,6 +638,56 @@ function updateCameraFooter(cameraId, statusData) {
         if (cameraCountdownIntervals[cameraId]) {
             clearInterval(cameraCountdownIntervals[cameraId]);
             delete cameraCountdownIntervals[cameraId];
+        }
+    }
+}
+
+// Update per-camera PIR and WiFi indicators
+function updateCameraIndicators(cameraId, statusData) {
+    const pirElement = document.getElementById(`pir-status-${cameraId}`);
+    const wifiElement = document.getElementById(`wifi-status-${cameraId}`);
+
+    // Update PIR status
+    if (pirElement) {
+        if (statusData.motion_active) {
+            pirElement.textContent = 'PIR: MOTION';
+            pirElement.className = 'status-badge enabled';
+            pirElement.title = 'Motion detected';
+        } else {
+            pirElement.textContent = 'PIR: IDLE';
+            pirElement.className = 'status-badge disabled';
+            pirElement.title = 'No motion';
+        }
+    }
+
+    // Update WiFi status
+    if (wifiElement) {
+        if (statusData.wifi_signal !== null && statusData.wifi_signal !== undefined) {
+            const rssi = statusData.wifi_signal;
+            let signalText, signalClass;
+
+            // RSSI ranges: -30 (excellent) to -90 (terrible)
+            if (rssi >= -50) {
+                signalText = 'Excellent';
+                signalClass = 'status-badge enabled';
+            } else if (rssi >= -60) {
+                signalText = 'Good';
+                signalClass = 'status-badge enabled';
+            } else if (rssi >= -70) {
+                signalText = 'Fair';
+                signalClass = 'status-badge active';
+            } else {
+                signalText = 'Poor';
+                signalClass = 'status-badge disabled';
+            }
+
+            wifiElement.textContent = `WiFi: ${rssi} dBm`;
+            wifiElement.className = signalClass;
+            wifiElement.title = `${signalText} signal strength`;
+        } else {
+            wifiElement.textContent = 'WiFi: --';
+            wifiElement.className = 'status-badge disabled';
+            wifiElement.title = 'No signal data';
         }
     }
 }
@@ -1031,6 +1047,11 @@ function renderCameraGrid() {
     }
 
     grid.innerHTML = Object.values(camerasData).map(camera => createCameraCard(camera)).join('');
+
+    // Update indicators for all cameras after rendering
+    Object.values(camerasData).forEach(camera => {
+        updateCameraIndicators(camera.id, camera.state);
+    });
 }
 
 function createCameraCard(camera) {
@@ -1054,6 +1075,8 @@ function createCameraCard(camera) {
             <div class="camera-grid-info">
                 <span>Session: ${camera.state.session_detections || 0}</span>
                 <span>Enabled: ${camera.enabled ? '✓' : '✗'}</span>
+                <span id="pir-status-${camera.id}" class="status-badge disabled">PIR: --</span>
+                <span id="wifi-status-${camera.id}" class="status-badge disabled">WiFi: --</span>
             </div>
             <div class="camera-grid-footer" id="camera-footer-${camera.id}">
                 <div class="footer-status">⚪ IDLE</div>

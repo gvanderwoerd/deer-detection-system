@@ -150,7 +150,9 @@ class Camera:
                 "session_active": self.session_active,
                 "session_detections": self.session_detections,
                 "cooldown_until": self.cooldown_until,
-                "last_detection": self.last_detection
+                "last_detection": self.last_detection,
+                "motion_active": self.motion_active,
+                "wifi_signal": self.wifi_signal
             }
         }
 

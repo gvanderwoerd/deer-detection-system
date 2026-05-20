@@ -196,7 +196,7 @@ class DeerDetectionSystem:
                             # Trigger per-camera detection
                             if camera.trigger_detection():
                                 logger.info(f"✅ [{camera.name}] Detection session started via PIR")
-                        socketio.emit('motion_status', {'active': camera.motion_active})
+                        socketio.emit('motion_status', {'camera_id': camera.id, 'active': camera.motion_active})
                         logger.info(f"PIR: {'MOTION DETECTED' if camera.motion_active else 'no motion'}")
 
                     if camera.wifi_signal and camera.wifi_signal != self.wifi_signal:
@@ -691,7 +691,9 @@ def api_camera_detection_status(camera_id):
         'session_detections': camera.session_detections,
         'active_window_seconds': camera.timing['active_window_seconds'],
         'cooldown_period_seconds': camera.timing['cooldown_period_seconds'],
-        'last_detection': camera.last_detection
+        'last_detection': camera.last_detection,
+        'motion_active': camera.motion_active,
+        'wifi_signal': camera.wifi_signal
     }
 
     # Add device assignment durations
