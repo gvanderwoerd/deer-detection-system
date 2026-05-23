@@ -1033,7 +1033,8 @@ function createCameraCard(camera) {
     const statusClass = isOnline ? 'online' : 'offline';
     const statusText = isOnline ? '🟢 ONLINE' : '🔴 OFFLINE';
 
-    const videoUrl = `/video_feed/${camera.id}`;
+    // Add timestamp to prevent caching and force reconnection when page reloads
+    const videoUrl = `/video_feed/${camera.id}?t=${Date.now()}`;
     const offlinePlaceholder = isOnline ? '' : `<div class="offline-placeholder"><p>📷 ${camera.name} Offline</p></div>`;
 
     return `
@@ -1043,6 +1044,9 @@ function createCameraCard(camera) {
                 <div class="camera-grid-status ${statusClass}">${statusText}</div>
             </div>
             <div class="camera-grid-video">
+                <div class="camera-controls">
+                    <button class="flip-btn" onclick="toggleFlip('${camera.id}', 'vertical')" title="Rotate 180°">🔄</button>
+                </div>
                 <img src="${videoUrl}" alt="${camera.name}" style="display: ${isOnline ? 'block' : 'none'};">
                 ${offlinePlaceholder}
             </div>
@@ -1174,6 +1178,28 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[DEBUG] Initialization complete!');
     console.log('[DEBUG] ========================================');
 });
+
+// Toggle flip settings for a camera
+async function toggleFlip(cameraId, flipType) {
+    try {
+        const response = await fetch(`/api/cameras/${cameraId}/flip`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: flipType })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            console.log(`[FLIP] Camera ${cameraId} ${flipType} flip toggled`);
+            // Reload camera grid to show updated flip state
+            setTimeout(() => initCameraGrid(), 500);
+        } else {
+            console.error('[FLIP] Failed:', result.error);
+        }
+    } catch (error) {
+        console.error('[FLIP] Error:', error);
+    }
+}
 
 // Handle page visibility
 document.addEventListener('visibilitychange', () => {

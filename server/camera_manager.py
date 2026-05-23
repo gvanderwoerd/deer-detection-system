@@ -40,6 +40,10 @@ DEFAULT_CAMERA_CONFIG = {
         "cooldown_period_seconds": 120,
         "max_detections_per_session": 3
     },
+    "display": {
+        "flip_vertical": False,
+        "flip_horizontal": False
+    },
     "state": {
         "online": False,
         "session_active": False,
@@ -67,6 +71,7 @@ class Camera:
         self.detection_config = DEFAULT_CAMERA_CONFIG["detection_config"].copy()
         self.device_assignments = []
         self.timing = DEFAULT_CAMERA_CONFIG["timing"].copy()
+        self.display = DEFAULT_CAMERA_CONFIG["display"].copy()
 
         # Runtime state
         self.online = False
@@ -79,6 +84,8 @@ class Camera:
         self.current_frame = None
         self.current_jpg = None
         self.annotated_jpg = None
+        self.display_jpg = None  # Frame with timestamp overlay
+        self.last_timestamp_update = 0  # Throttle timestamp updates
         self.frame_lock = threading.Lock()
 
         # Status tracking
@@ -131,6 +138,17 @@ class Camera:
         elapsed = time.time() - self.session_start
         return elapsed > self.timing['active_window_seconds']
 
+    def apply_flip(self, frame):
+        """Apply 180-degree rotation to frame if flip is enabled"""
+        if frame is None:
+            return frame
+
+        # Apply 180-degree rotation if enabled
+        if self.display.get('flip_vertical', False):
+            return cv2.rotate(frame, cv2.ROTATE_180)
+
+        return frame
+
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
         return {
@@ -145,6 +163,7 @@ class Camera:
             "detection_config": self.detection_config,
             "device_assignments": self.device_assignments,
             "timing": self.timing,
+            "display": self.display,
             "state": {
                 "online": self.online,
                 "session_active": self.session_active,
@@ -346,6 +365,8 @@ class CameraManager:
             camera.device_assignments = data['device_assignments']
         if 'timing' in data:
             camera.timing = data['timing']
+        if 'display' in data:
+            camera.display = data['display']
 
         self._save_cameras()
         logger.info(f"Updated camera: {camera_id}")
@@ -463,7 +484,10 @@ class CameraManager:
                                     camera.motion_active = is_active
                                     if is_active:
                                         camera.last_detection = datetime.now().isoformat()
-                                        logger.info(f"[{camera.name}] PIR: MOTION DETECTED")
+                                        logger.info(f"[{camera.name}] PIR: MOTION DETECTED - Auto-triggering detection")
+                                        # Trigger detection session when motion detected
+                                        if camera.trigger_detection():
+                                            logger.info(f"✅ [{camera.name}] Detection session started via PIR")
                                     logger.debug(f"[{camera.name}] PIR: {'MOTION' if is_active else 'no motion'}")
 
                         # Parse WiFi signal
@@ -489,9 +513,34 @@ class CameraManager:
                             frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
 
                             if frame is not None:
+                                # Apply flip transformations if configured
+                                frame = camera.apply_flip(frame)
+                                # Add timestamp overlay (throttled to once per second)
+                                now = time.time()
+                                if now - camera.last_timestamp_update >= 1.0:
+                                    frame_copy = frame.copy()
+                                    timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+                                    font = cv2.FONT_HERSHEY_SIMPLEX
+                                    scale = 0.65
+                                    thickness = 2
+                                    color = (255, 255, 255)
+
+                                    (text_width, text_height), baseline = cv2.getTextSize(timestamp, font, scale, thickness)
+                                    x, y = 10, frame_copy.shape[0] - 10
+
+                                    cv2.rectangle(frame_copy, (x, y - text_height - 5), (x + text_width, y + baseline), (0, 0, 0), -1)
+                                    cv2.putText(frame_copy, timestamp, (x, y), font, scale, color, thickness, cv2.LINE_AA)
+
+                                    _, stamped_buffer = cv2.imencode('.jpg', frame_copy, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                    display_jpg = stamped_buffer.tobytes()
+
+                                    with camera.frame_lock:
+                                        camera.display_jpg = display_jpg
+                                        camera.last_timestamp_update = now
+
                                 with camera.frame_lock:
                                     camera.current_frame = frame
-                                    camera.current_jpg = jpg
+                                    camera.current_jpg = jpg  # Store raw JPEG for speed
 
                                     # Mark camera as online
                                     now = time.time()

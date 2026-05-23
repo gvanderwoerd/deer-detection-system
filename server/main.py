@@ -121,6 +121,7 @@ class DeerDetectionSystem:
         self.enabled = True
         self.motion_active = False  # Real-time PIR sensor state (from first camera)
         self.wifi_signal = None  # WiFi signal strength (RSSI in dBm) (from first camera)
+        self.camera_motion_states = {}  # Track previous motion state per camera
 
         # Session tracking
         self.session_start = None
@@ -188,16 +189,19 @@ class DeerDetectionSystem:
                         continue
 
                     # Copy PIR and WiFi status from camera, trigger per-camera detection
-                    if camera.motion_active != self.motion_active:
-                        self.motion_active = camera.motion_active
+                    # Track motion state per camera (not globally)
+                    prev_motion = self.camera_motion_states.get(camera.camera_id, False)
+                    if camera.motion_active != prev_motion:
+                        self.camera_motion_states[camera.camera_id] = camera.motion_active
+                        self.motion_active = camera.motion_active  # Keep global for backward compatibility
                         if camera.motion_active:
                             self.last_detection_time = datetime.now()
                             logger.info(f"🎯 PIR: MOTION DETECTED on {camera.name} - Auto-triggering detection")
                             # Trigger per-camera detection
                             if camera.trigger_detection():
                                 logger.info(f"✅ [{camera.name}] Detection session started via PIR")
-                        socketio.emit('motion_status', {'camera_id': camera.id, 'active': camera.motion_active})
-                        logger.info(f"PIR: {'MOTION DETECTED' if camera.motion_active else 'no motion'}")
+                        socketio.emit('motion_status', {'camera_id': camera.camera_id, 'active': camera.motion_active})
+                        logger.info(f"PIR [{camera.name}]: {'MOTION DETECTED' if camera.motion_active else 'no motion'}")
 
                     if camera.wifi_signal and camera.wifi_signal != self.wifi_signal:
                         self.wifi_signal = camera.wifi_signal
@@ -815,7 +819,8 @@ def video_feed_camera(camera_id):
         while True:
             try:
                 with cam.frame_lock:
-                    jpg = cam.annotated_jpg if cam.annotated_jpg is not None else cam.current_jpg
+                    # Priority: annotated (with detections) > display (with timestamp) > raw
+                    jpg = cam.annotated_jpg if cam.annotated_jpg is not None else (cam.display_jpg if cam.display_jpg is not None else cam.current_jpg)
 
                 if jpg is not None and jpg != last_jpg:
                     last_jpg = jpg
@@ -1003,6 +1008,38 @@ def api_disable_camera(camera_id):
             return jsonify({'success': False, 'error': 'Failed to disable camera'}), 500
     except Exception as e:
         logger.error(f"Error disabling camera: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cameras/<camera_id>/flip', methods=['POST'])
+def api_toggle_flip(camera_id):
+    """Toggle flip settings for a camera"""
+    try:
+        cm = get_camera_manager()
+        camera = cm.get_camera(camera_id)
+
+        if not camera:
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+
+        data = request.json or {}
+        flip_type = data.get('type')  # 'vertical' or 'horizontal'
+
+        if flip_type not in ['vertical', 'horizontal']:
+            return jsonify({'success': False, 'error': 'Invalid flip type'}), 400
+
+        # Toggle the flip setting
+        display = camera.display.copy()
+        if flip_type == 'vertical':
+            display['flip_vertical'] = not display.get('flip_vertical', False)
+        else:
+            display['flip_horizontal'] = not display.get('flip_horizontal', False)
+
+        if cm.update_camera(camera_id, {'display': display}):
+            logger.info(f"🔄 Camera {camera_id} flip_{flip_type} toggled to {display.get(f'flip_{flip_type}')}")
+            return jsonify({'success': True, 'display': display})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to update flip settings'}), 500
+    except Exception as e:
+        logger.error(f"Error toggling flip: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

@@ -554,6 +554,36 @@ footer {
     margin-bottom: 10px;
 }
 
+.camera-grid-video .camera-controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    display: flex;
+    gap: 5px;
+}
+
+.flip-btn {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+
+.flip-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    border-color: var(--accent-primary);
+    transform: scale(1.1);
+}
+
+.flip-btn:active {
+    transform: scale(0.95);
+}
+
 .camera-grid-video img {
     width: 100%;
     height: 100%;
