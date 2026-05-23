@@ -1179,6 +1179,22 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[DEBUG] ========================================');
 });
 
+// Reinitialize camera grid when page becomes visible (fixes black screen after navigation)
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && document.getElementById('camerasGrid')) {
+        console.log('[DEBUG] Page visible - reinitializing camera grid');
+        initCameraGrid();
+    }
+});
+
+// Reinitialize camera grid when navigating back to page (browser back button)
+window.addEventListener('pageshow', function(event) {
+    if (event.persisted && document.getElementById('camerasGrid')) {
+        console.log('[DEBUG] Page restored from cache - reinitializing camera grid');
+        initCameraGrid();
+    }
+});
+
 // Toggle flip settings for a camera
 async function toggleFlip(cameraId, flipType) {
     try {

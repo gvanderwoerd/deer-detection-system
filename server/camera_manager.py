@@ -86,6 +86,7 @@ class Camera:
         self.annotated_jpg = None
         self.display_jpg = None  # Frame with timestamp overlay
         self.last_timestamp_update = 0  # Throttle timestamp updates
+        self.current_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")  # Current timestamp text
         self.frame_lock = threading.Lock()
 
         # Status tracking
@@ -191,6 +192,7 @@ class Camera:
         camera.detection_config = data.get('detection_config', DEFAULT_CAMERA_CONFIG['detection_config'].copy())
         camera.device_assignments = data.get('device_assignments', [])
         camera.timing = data.get('timing', DEFAULT_CAMERA_CONFIG['timing'].copy())
+        camera.display = data.get('display', DEFAULT_CAMERA_CONFIG['display'].copy())
 
         state = data.get('state', {})
         camera.online = state.get('online', False)
@@ -198,6 +200,14 @@ class Camera:
         camera.session_detections = state.get('session_detections', 0)
         camera.cooldown_until = state.get('cooldown_until')
         camera.last_detection = state.get('last_detection')
+
+        # Reset stale sessions on startup (session_start is not persisted)
+        # If session was active but we don't have a session_start timestamp,
+        # the session can't expire properly, so reset it
+        if camera.session_active and camera.session_start is None:
+            logger.info(f"[{camera.name}] Resetting stale detection session on startup")
+            camera.session_active = False
+            camera.session_detections = 0
 
         return camera
 
@@ -515,32 +525,36 @@ class CameraManager:
                             if frame is not None:
                                 # Apply flip transformations if configured
                                 frame = camera.apply_flip(frame)
-                                # Add timestamp overlay (throttled to once per second)
+                                if frame is None:
+                                    logger.error(f"[{camera.name}] apply_flip returned None!")
+                                    continue  # Skip this frame if apply_flip failed
+                                # Update timestamp text once per second
                                 now = time.time()
                                 if now - camera.last_timestamp_update >= 1.0:
-                                    frame_copy = frame.copy()
-                                    timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-                                    font = cv2.FONT_HERSHEY_SIMPLEX
-                                    scale = 0.65
-                                    thickness = 2
-                                    color = (255, 255, 255)
+                                    camera.current_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+                                    camera.last_timestamp_update = now
+                                    logger.debug(f"[{camera.name}] Updated timestamp text: {camera.current_timestamp}")
 
-                                    (text_width, text_height), baseline = cv2.getTextSize(timestamp, font, scale, thickness)
-                                    x, y = 10, frame_copy.shape[0] - 10
+                                # Apply timestamp overlay to EVERY frame (using current timestamp text)
+                                font = cv2.FONT_HERSHEY_SIMPLEX
+                                scale = 0.65
+                                thickness = 2
+                                color = (255, 255, 255)
 
-                                    cv2.rectangle(frame_copy, (x, y - text_height - 5), (x + text_width, y + baseline), (0, 0, 0), -1)
-                                    cv2.putText(frame_copy, timestamp, (x, y), font, scale, color, thickness, cv2.LINE_AA)
+                                (text_width, text_height), baseline = cv2.getTextSize(camera.current_timestamp, font, scale, thickness)
+                                x, y = 10, frame.shape[0] - 10
 
-                                    _, stamped_buffer = cv2.imencode('.jpg', frame_copy, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                                    display_jpg = stamped_buffer.tobytes()
+                                # Draw timestamp on frame
+                                cv2.rectangle(frame, (x, y - text_height - 5), (x + text_width, y + baseline), (0, 0, 0), -1)
+                                cv2.putText(frame, camera.current_timestamp, (x, y), font, scale, color, thickness, cv2.LINE_AA)
 
-                                    with camera.frame_lock:
-                                        camera.display_jpg = display_jpg
-                                        camera.last_timestamp_update = now
+                                # Re-encode frame as JPEG (always, after flip and timestamp)
+                                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                jpg = buffer.tobytes()
 
                                 with camera.frame_lock:
                                     camera.current_frame = frame
-                                    camera.current_jpg = jpg  # Store raw JPEG for speed
+                                    camera.current_jpg = jpg  # Store JPEG with timestamp and flip
 
                                     # Mark camera as online
                                     now = time.time()
