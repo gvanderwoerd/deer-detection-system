@@ -1,5 +1,78 @@
 # Changelog - Deer Detection System
 
+## 2026-05-23 - Timestamp Display & Session Management Fixes
+
+### 🐛 Bug Fixes
+
+**Timestamp Flashing on Front Garden Camera**
+- **Issue:** Timestamp appearing to flash on/off during live stream
+- **Root Cause:** Timestamp only applied once per second, other 29 frames had no timestamp
+- **Fix:** Separate timestamp text update (1/sec) from rendering (every frame)
+  - Added `current_timestamp` variable to store timestamp text
+  - Apply stored timestamp to EVERY frame, update text once per second
+  - Re-encode all frames as JPEG after timestamp overlay
+- **Impact:** Steady timestamp display on all cameras
+- **Files:** `server/camera_manager.py` (lines 89, 533-550)
+
+**Stale Detection Sessions Blocking Device Activation**
+- **Issue:** Default Camera detecting objects but not activating sprinkler
+- **Root Cause:** Detection session stuck at max (3/3) after server restart
+  - `session_active=true` loaded from JSON but `session_start` not persisted
+  - Session couldn't expire without start timestamp
+- **Fix:** Reset stale sessions on startup in `from_dict()` method
+  - Check if `session_active` but `session_start is None`
+  - Clear session state and detection count
+- **Impact:** Device activation works correctly after server restarts
+- **Files:** `server/camera_manager.py` (lines 204-210)
+
+**Black Screen After Navigating Back to Dashboard**
+- **Issue:** Video feeds not reconnecting when returning from manage cameras page
+- **Root Cause:** Browser not re-initializing video streams on cached page load
+- **Fix:** Added page visibility event listeners
+  - `visibilitychange` - reinit when page becomes visible
+  - `pageshow` with `event.persisted` - reinit when loaded from back/forward cache
+- **Impact:** Reliable video reconnection with fresh timestamps
+- **Files:** `web/app.js` (lines 1183-1196)
+
+**Display Settings Not Loading from Configuration**
+- **Issue:** Camera flip settings not persisted across restarts
+- **Root Cause:** `from_dict()` method missing display settings restoration
+- **Fix:** Added `camera.display = data.get('display', ...)` to config loading
+- **Impact:** Flip settings now persist correctly
+- **Files:** `server/camera_manager.py` (line 194)
+
+### 📋 Technical Details
+
+**Timestamp Rendering Architecture:**
+```python
+# Update timestamp text (throttled to 1 Hz)
+if now - camera.last_timestamp_update >= 1.0:
+    camera.current_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+    camera.last_timestamp_update = now
+
+# Apply to EVERY frame (30 Hz)
+cv2.putText(frame, camera.current_timestamp, (x, y), font, scale, color, thickness)
+```
+
+**Session State Validation:**
+```python
+# Reset stale sessions without session_start timestamp
+if camera.session_active and camera.session_start is None:
+    logger.info(f"[{camera.name}] Resetting stale detection session on startup")
+    camera.session_active = False
+    camera.session_detections = 0
+```
+
+### 🔮 Future Considerations
+
+**Remote Access Options Discussed:**
+- **Tailscale** (Recommended): Zero-config VPN for secure remote access
+- **Cloudflare Tunnel**: Public URL with reverse proxy
+- **Progressive Web App**: Install dashboard as iPhone app
+- **Native iOS App**: Full-featured mobile application
+
+---
+
 ## 2026-05-23 - Multi-Camera Fixes & Camera Flip Controls
 
 ### 🐛 Bug Fixes
