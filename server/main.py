@@ -821,6 +821,14 @@ def video_feed_camera(camera_id):
                 with cam.frame_lock:
                     # Priority: annotated (with detections) > display (with timestamp) > raw
                     jpg = cam.annotated_jpg if cam.annotated_jpg is not None else (cam.display_jpg if cam.display_jpg is not None else cam.current_jpg)
+                    # Debug: log which buffer is being used (only log once per connection)
+                    if last_jpg is None and jpg is not None:
+                        if cam.annotated_jpg is not None:
+                            logger.info(f"[{cam.name}] Video feed using: annotated buffer")
+                        elif cam.display_jpg is not None:
+                            logger.info(f"[{cam.name}] Video feed using: display_jpg (with timestamp)")
+                        else:
+                            logger.warning(f"[{cam.name}] Video feed using: current_jpg (RAW - NO TIMESTAMP!)")
 
                 if jpg is not None and jpg != last_jpg:
                     last_jpg = jpg

@@ -810,7 +810,7 @@ function setupEventListeners() {
             elements.btnCloudSync.textContent = '⏳ Syncing...';
             
             try {
-                const result = await apiCall('/api/devices/refresh', 'POST');
+                const result = await apiCall('/devices/refresh', 'POST');
                 if (result.success) {
                     addLogEntry('success', '✅ Cloud Status Synced Successfully');
                     if (result.api_error) {
