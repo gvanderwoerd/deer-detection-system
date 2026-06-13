@@ -1182,16 +1182,32 @@ document.addEventListener('DOMContentLoaded', () => {
 // Reinitialize camera grid when page becomes visible (fixes black screen after navigation)
 document.addEventListener('visibilitychange', function() {
     if (!document.hidden && document.getElementById('camerasGrid')) {
-        console.log('[DEBUG] Page visible - reinitializing camera grid');
-        initCameraGrid();
+        console.log('[DEBUG] Page visible - reloading camera feeds');
+        // Force reload all video feed images
+        document.querySelectorAll('img[src*="/video_feed/"]').forEach(img => {
+            const oldSrc = img.src;
+            const baseSrc = oldSrc.split('?')[0];
+            img.src = `${baseSrc}?t=${Date.now()}`;
+            console.log('[DEBUG] Reloaded video feed:', baseSrc);
+        });
+        // Also reinit the grid to get fresh camera data
+        setTimeout(() => initCameraGrid(), 100);
     }
 });
 
 // Reinitialize camera grid when navigating back to page (browser back button)
 window.addEventListener('pageshow', function(event) {
     if (event.persisted && document.getElementById('camerasGrid')) {
-        console.log('[DEBUG] Page restored from cache - reinitializing camera grid');
-        initCameraGrid();
+        console.log('[DEBUG] Page restored from cache - reloading camera feeds');
+        // Force reload all video feed images
+        document.querySelectorAll('img[src*="/video_feed/"]').forEach(img => {
+            const oldSrc = img.src;
+            const baseSrc = oldSrc.split('?')[0];
+            img.src = `${baseSrc}?t=${Date.now()}`;
+            console.log('[DEBUG] Reloaded video feed:', baseSrc);
+        });
+        // Also reinit the grid to get fresh camera data
+        setTimeout(() => initCameraGrid(), 100);
     }
 });
 
