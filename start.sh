@@ -39,6 +39,87 @@ fi
 # Navigate to server directory
 cd "$(dirname "$0")/server"
 
+# Function to show progress
+show_progress() {
+    local percent=$1
+    local message=$2
+    local bar_length=40
+    local filled=$((percent * bar_length / 100))
+    local empty=$((bar_length - filled))
+
+    printf "\r${YELLOW}[%${filled}s%${empty}s] %3d%% - %s${NC}" \
+        "$(printf '█%.0s' $(seq 1 $filled))" \
+        "$(printf ' %.0s' $(seq 1 $empty))" \
+        "$percent" \
+        "$message"
+}
+
+# Function to detect GPU and select appropriate requirements file
+detect_hardware() {
+    # Check for NVIDIA GPU
+    if command -v nvidia-smi &> /dev/null; then
+        if nvidia-smi &> /dev/null; then
+            echo -e "${GREEN}🎮 NVIDIA GPU detected - using GPU-accelerated PyTorch${NC}" >&2
+            echo "requirements-gpu.txt"
+            return
+        fi
+    fi
+
+    # No GPU detected - use CPU-only version
+    echo -e "${YELLOW}💻 No GPU detected - using CPU-optimized PyTorch (~1.7GB)${NC}" >&2
+    echo "requirements-cpu.txt"
+}
+
+# Check if venv needs to be rebuilt (for portability after moving project)
+VENV_NEEDS_REBUILD=false
+if [ -d "venv" ] && [ -f "venv/pyvenv.cfg" ]; then
+    # Get the expected venv path from current location
+    CURRENT_VENV_PATH="$(pwd)/venv"
+    # Get the actual venv path from config
+    CONFIGURED_VENV_PATH=$(grep "^command = " venv/pyvenv.cfg | sed 's/.*venv //' | tr -d '\r')
+
+    if [ "$CONFIGURED_VENV_PATH" != "$CURRENT_VENV_PATH" ]; then
+        VENV_NEEDS_REBUILD=true
+        echo -e "${YELLOW}📦 Project location changed - rebuilding virtual environment...${NC}"
+        echo -e "${YELLOW}   Old location: $CONFIGURED_VENV_PATH${NC}"
+        echo -e "${YELLOW}   New location: $CURRENT_VENV_PATH${NC}"
+        echo ""
+
+        show_progress 0 "Preparing to rebuild..."
+        sleep 0.5
+
+        show_progress 20 "Removing old virtual environment..."
+        rm -rf venv
+
+        show_progress 40 "Creating new virtual environment..."
+        python3 -m venv venv > /dev/null 2>&1
+
+        show_progress 60 "Activating environment..."
+        source venv/bin/activate
+
+        show_progress 70 "Upgrading pip..."
+        pip install --upgrade pip -q > /dev/null 2>&1
+
+        show_progress 75 "Detecting hardware..."
+        REQUIREMENTS_FILE=$(detect_hardware)
+
+        if [ "$REQUIREMENTS_FILE" = "requirements-cpu.txt" ]; then
+            show_progress 78 "Installing CPU-only PyTorch..."
+            pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu > /dev/null 2>&1
+            show_progress 82 "Installing dependencies..."
+            pip install -q -r "$REQUIREMENTS_FILE" > /dev/null 2>&1
+        else
+            show_progress 80 "Installing dependencies ($REQUIREMENTS_FILE)..."
+            pip install -q -r "$REQUIREMENTS_FILE" > /dev/null 2>&1
+        fi
+
+        show_progress 100 "Complete!"
+        echo ""
+        echo -e "${GREEN}✓ Virtual environment rebuilt successfully${NC}"
+        echo ""
+    fi
+fi
+
 # Check if virtual environment exists, create if not
 if [ ! -d "venv" ]; then
     echo -e "${YELLOW}Creating virtual environment...${NC}"
@@ -46,13 +127,24 @@ if [ ! -d "venv" ]; then
     echo -e "${GREEN}✓ Virtual environment created${NC}"
 fi
 
-# Activate virtual environment
-echo -e "${YELLOW}Activating virtual environment...${NC}"
-source venv/bin/activate
+# Activate virtual environment (skip if already activated during rebuild)
+if [ "$VENV_NEEDS_REBUILD" = false ]; then
+    echo -e "${YELLOW}Activating virtual environment...${NC}"
+    source venv/bin/activate
 
-# Install/update requirements
-echo -e "${YELLOW}Checking dependencies...${NC}"
-pip install -q -r requirements.txt
+    # Detect hardware and select appropriate requirements file
+    REQUIREMENTS_FILE=$(detect_hardware)
+
+    # Install/update requirements
+    echo -e "${YELLOW}Checking dependencies...${NC}"
+    if [ "$REQUIREMENTS_FILE" = "requirements-cpu.txt" ]; then
+        # CPU version requires special PyTorch installation
+        pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+        pip install -q -r "$REQUIREMENTS_FILE"
+    else
+        pip install -q -r "$REQUIREMENTS_FILE"
+    fi
+fi
 
 # Check for required files
 if [ ! -f "yolov8n.pt" ]; then

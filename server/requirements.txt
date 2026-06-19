@@ -1,4 +1,14 @@
 # Deer Detection System - Python Dependencies
+#
+# DEPRECATED: Use hardware-specific requirements files instead:
+#   - requirements-cpu.txt (500MB, no GPU - recommended for most systems)
+#   - requirements-gpu.txt (5GB, NVIDIA GPU + CUDA support)
+#
+# The start.sh script automatically detects your hardware and uses the correct file.
+#
+# For manual installation:
+#   pip install -r requirements-cpu.txt   (CPU-only)
+#   pip install -r requirements-gpu.txt   (GPU-accelerated)
 
 # Computer Vision and AI
 opencv-python>=4.8.0

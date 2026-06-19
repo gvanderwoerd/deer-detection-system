@@ -20,8 +20,7 @@ AI-powered animal detection system using ESP32-CAM + YOLOv8 + SmartLife valves.
 ## Quick Start
 
 ```bash
-# Start system
-cd /mnt/linux-data/deer-detection-system
+# Start system (from project directory)
 ./start.sh
 
 # Access dashboard
@@ -30,6 +29,10 @@ http://192.168.1.15:5000
 # Stop system
 ./stop.sh
 ```
+
+**Note:** The system automatically detects your hardware and installs the optimal PyTorch version:
+- 🎮 **With NVIDIA GPU**: GPU-accelerated PyTorch (~5GB, faster inference)
+- 💻 **Without GPU**: CPU-optimized PyTorch (~500MB, smaller footprint)
 
 ---
 
@@ -61,6 +64,10 @@ http://192.168.1.15:5000
 - **5V 1A+ Power Supply** (brownout prevention)
 - **SmartLife-compatible water valves** (Tuya protocol)
 - **Desktop PC/Server** (Linux recommended)
+  - CPU: Any modern processor (AI runs on CPU)
+  - RAM: 2GB+ recommended
+  - GPU: Optional NVIDIA GPU for faster inference (auto-detected)
+  - Storage: 1GB+ (500MB without GPU, 5GB with GPU support)
 
 ### Software
 - Python 3.12+
@@ -80,12 +87,31 @@ cd deer-detection-system
 ```
 
 ### 2. Setup Python Environment
+
+**Option A: Automatic (Recommended)**
+```bash
+# Just run start.sh - it auto-detects hardware and installs dependencies
+./start.sh
+```
+
+**Option B: Manual Setup**
 ```bash
 cd server
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+
+# Install CPU-only version (500MB, no GPU required)
+pip install -r requirements-cpu.txt
+
+# OR install GPU version (5GB, requires NVIDIA GPU + CUDA)
+pip install -r requirements-gpu.txt
 ```
+
+**Hardware Auto-Detection:**
+- System detects NVIDIA GPU using `nvidia-smi`
+- GPU found → installs `requirements-gpu.txt` (faster inference)
+- No GPU → installs `requirements-cpu.txt` (smaller, efficient)
+- Portable: moving project to different hardware auto-adapts
 
 ### 3. Configure System
 Edit `server/config.py`:
