@@ -11,7 +11,7 @@
       "last_seen": null,
       "position": 0,
       "detection_config": {
-        "confidence_threshold": 0.25,
+        "confidence_threshold": 0.45,
         "enabled_objects": {
           "person": false,
           "cat": true,
@@ -26,7 +26,7 @@
       "device_assignments": [
         {
           "device_id": "eb2f5498a4e53362f5lumi",
-          "duration_seconds": 20
+          "duration_seconds": 30
         }
       ],
       "timing": {
@@ -40,12 +40,12 @@
       },
       "state": {
         "online": true,
-        "session_active": true,
-        "session_detections": 3,
-        "cooldown_until": 1779165481.5315647,
-        "last_detection": "2026-05-23T13:54:33.285935",
+        "session_active": false,
+        "session_detections": 0,
+        "cooldown_until": 1781663906.3181717,
+        "last_detection": "2026-06-16T19:36:26.231851",
         "motion_active": true,
-        "wifi_signal": -36
+        "wifi_signal": -75
       }
     },
     {
@@ -58,9 +58,9 @@
       "last_seen": null,
       "position": 0,
       "detection_config": {
-        "confidence_threshold": 0.25,
+        "confidence_threshold": 0.45,
         "enabled_objects": {
-          "person": true,
+          "person": false,
           "cat": true,
           "dog": true,
           "horse": true,
@@ -73,7 +73,7 @@
       "device_assignments": [
         {
           "device_id": "eb80b3cea67aed7c178mil",
-          "duration_seconds": 10
+          "duration_seconds": 30
         }
       ],
       "timing": {
@@ -88,11 +88,58 @@
       "state": {
         "online": true,
         "session_active": true,
-        "session_detections": 3,
-        "cooldown_until": 1779566283.0650716,
-        "last_detection": "2026-05-23T13:58:30.612599",
+        "session_detections": 0,
+        "cooldown_until": 1781663830.5227697,
+        "last_detection": "2026-06-16T19:37:18.851319",
         "motion_active": false,
-        "wifi_signal": -34
+        "wifi_signal": -67
+      }
+    },
+    {
+      "id": "camera-rear-flower-garden",
+      "name": "Rear Flower Garden",
+      "hostname": "esp32cam-rear.local",
+      "stream_url": "http://esp32cam-rear.local:81/",
+      "enabled": true,
+      "created_at": "2026-05-25T19:46:06.036927",
+      "last_seen": null,
+      "position": 0,
+      "detection_config": {
+        "confidence_threshold": 0.45,
+        "enabled_objects": {
+          "person": false,
+          "cat": true,
+          "dog": true,
+          "horse": true,
+          "sheep": true,
+          "cow": true,
+          "bear": true
+        },
+        "save_person_detections": false
+      },
+      "device_assignments": [
+        {
+          "device_id": "eb5ff64397d33d34adepce",
+          "duration_seconds": 60
+        }
+      ],
+      "timing": {
+        "active_window_seconds": 60,
+        "cooldown_period_seconds": 60,
+        "max_detections_per_session": 3
+      },
+      "display": {
+        "flip_vertical": false,
+        "flip_horizontal": false
+      },
+      "state": {
+        "online": true,
+        "session_active": false,
+        "session_detections": 0,
+        "cooldown_until": 1781499153.1998887,
+        "last_detection": "2026-06-14T21:50:32.683481",
+        "motion_active": true,
+        "wifi_signal": -79
       }
     }
   ]

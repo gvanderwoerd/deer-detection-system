@@ -1,7 +1,9 @@
 # Sprinkler Control Troubleshooting Guide
 
-**Last Updated:** 2026-05-18
+**Last Updated:** 2026-06-19
 **Framework Version:** Phase 1-4 Complete
+
+> **Note for AI Agents:** After resolving issues, document learnings in `docs/DEVELOPMENT_NOTES.md`
 
 ---
 

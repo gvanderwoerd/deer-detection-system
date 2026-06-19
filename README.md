@@ -243,9 +243,19 @@ deer-detection-system/
 
 ## Documentation
 
-- **Project Log:** `PROJECT_LOG.md` - Complete project history and recent updates
-- **Firmware Guide:** `esp32-cam/FIRMWARE_NOTES.md` - **Critical ESP32-CAM documentation**
+- **README.md** (this file) - Main project documentation
 - **Troubleshooting:** `SPRINKLER_TROUBLESHOOTING.md` - Comprehensive troubleshooting guide
+- **Firmware Guide:** `esp32-cam/FIRMWARE_NOTES.md` - **Critical ESP32-CAM documentation**
+- **Development Notes:** `docs/DEVELOPMENT_NOTES.md` - Issue history and solutions for AI reference
+- **Archive:** `docs/archive/` - Historical documentation and session notes
+
+### For AI Agents
+
+**Important:** When troubleshooting or implementing features:
+1. Check `docs/DEVELOPMENT_NOTES.md` for similar past issues
+2. Document new learnings and solutions in `DEVELOPMENT_NOTES.md`
+3. Keep session context for future AI agents
+4. Update system state information when configurations change
 
 ---
 
