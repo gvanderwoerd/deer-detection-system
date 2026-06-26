@@ -104,33 +104,33 @@ class Camera:
         self.device_duration = None
 
     def trigger_detection(self) -> bool:
-        """Trigger a detection session on this camera"""
+        """
+        Reset cooldown and start new activation window
+        Note: Detection always runs - this just resets activation limits
+        """
         now = time.time()
 
-        # Check if in cooldown
-        if self.cooldown_until and now < self.cooldown_until:
-            remaining = int(self.cooldown_until - now)
-            logger.info(f"[{self.name}] Detection blocked - in cooldown ({remaining}s remaining)")
-            return False
+        # Clear cooldown
+        self.cooldown_until = None
 
-        # Check if already in active session
-        if self.session_active:
-            logger.debug(f"[{self.name}] Already in active session - extending")
-            return False
+        # Start new activation window
+        if not self.session_active:
+            logger.info(f"[{self.name}] Manual trigger: Starting new activation window")
+            self.session_active = True
+            self.session_detections = 0
+            self.session_start = now
+        else:
+            logger.info(f"[{self.name}] Manual trigger: Resetting cooldown in current window")
 
-        # Start new session
-        logger.info(f"[{self.name}] Detection session triggered")
-        self.session_active = True
-        self.session_detections = 0
-        self.session_start = now
         return True
 
     def end_session(self):
-        """End detection session and start cooldown"""
+        """End activation window (detection continues running)"""
         if self.session_active:
             self.session_active = False
-            self.cooldown_until = time.time() + self.timing['cooldown_period_seconds']
-            logger.info(f"[{self.name}] Session ended - cooldown {self.timing['cooldown_period_seconds']}s")
+            self.session_detections = 0
+            self.session_start = None
+            logger.info(f"[{self.name}] Activation window ended (detection still running)")
 
     def is_session_expired(self) -> bool:
         """Check if session has exceeded active window"""
@@ -152,6 +152,11 @@ class Camera:
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization"""
+        # Calculate time since last frame for diagnostics
+        seconds_since_frame = None
+        if self.last_frame_time is not None:
+            seconds_since_frame = int(time.time() - self.last_frame_time)
+
         return {
             "id": self.camera_id,
             "name": self.name,
@@ -173,6 +178,11 @@ class Camera:
                 "last_detection": self.last_detection,
                 "motion_active": self.motion_active,
                 "wifi_signal": self.wifi_signal
+            },
+            "diagnostics": {
+                "stream_active": self.stream_active,
+                "last_frame_time": self.last_frame_time,
+                "seconds_since_frame": seconds_since_frame
             }
         }
 
@@ -195,11 +205,15 @@ class Camera:
         camera.display = data.get('display', DEFAULT_CAMERA_CONFIG['display'].copy())
 
         state = data.get('state', {})
-        camera.online = state.get('online', False)
+        # Always start as offline - let capture thread set to online when connected
+        camera.online = False
         camera.session_active = state.get('session_active', False)
         camera.session_detections = state.get('session_detections', 0)
         camera.cooldown_until = state.get('cooldown_until')
         camera.last_detection = state.get('last_detection')
+        # Restore motion and wifi signal state if available
+        camera.motion_active = state.get('motion_active', False)
+        camera.wifi_signal = state.get('wifi_signal')
 
         # Reset stale sessions on startup (session_start is not persisted)
         # If session was active but we don't have a session_start timestamp,
@@ -259,6 +273,9 @@ class CameraManager:
         for camera_id in self.cameras:
             self._start_capture_thread(camera_id)
             self._start_detection_thread(camera_id)
+
+        # Start watchdog thread to monitor camera health
+        self._start_watchdog_thread()
 
         logger.info(f"✅ Camera Manager initialized with {len(self.cameras)} camera(s)")
 
@@ -493,11 +510,15 @@ class CameraManager:
                                 if camera.motion_active != is_active:
                                     camera.motion_active = is_active
                                     if is_active:
-                                        camera.last_detection = datetime.now().isoformat()
-                                        logger.info(f"[{camera.name}] PIR: MOTION DETECTED - Auto-triggering detection")
-                                        # Trigger detection session when motion detected
-                                        if camera.trigger_detection():
-                                            logger.info(f"✅ [{camera.name}] Detection session started via PIR")
+                                        logger.info(f"[{camera.name}] PIR: MOTION DETECTED - Resetting cooldown")
+                                        # Reset cooldown when motion detected (allows immediate sprinkler activation)
+                                        camera.cooldown_until = None
+                                        # Start new activation window if not already active
+                                        if not camera.session_active:
+                                            camera.session_active = True
+                                            camera.session_detections = 0
+                                            camera.session_start = time.time()
+                                            logger.info(f"✅ [{camera.name}] New activation window started via PIR")
                                     logger.debug(f"[{camera.name}] PIR: {'MOTION' if is_active else 'no motion'}")
 
                         # Parse WiFi signal
@@ -574,11 +595,13 @@ class CameraManager:
                     with camera.frame_lock:
                         camera.current_frame = None
                         camera.current_jpg = None
+                        camera.wifi_signal = None
                         if camera.stream_active:
                             logger.info(f"📷 [{camera.name}] Stream inactive")
                             camera.stream_active = False
-                            camera.online = False
-                            camera.last_frame_time = None
+                        # Always set offline on connection error
+                        camera.online = False
+                        camera.last_frame_time = None
                     time.sleep(5)
 
             logger.info(f"🛑 Stopped capture thread for {camera.name}")
@@ -594,7 +617,7 @@ class CameraManager:
             return
 
         def detection_worker():
-            """Process frames for this camera during detection sessions"""
+            """Process frames continuously - cooldown only affects sprinkler activation"""
             from config import MAX_DETECTIONS_PER_SESSION
             from device_manager import get_device_manager
 
@@ -605,79 +628,102 @@ class CameraManager:
 
             while True:
                 try:
-                    # Check if session is active
-                    if camera.session_active:
-                        # Check if session has expired
-                        if camera.is_session_expired():
-                            camera.end_session()
-                            continue
+                    # Reset activation window if expired
+                    if camera.session_active and camera.is_session_expired():
+                        logger.info(f"[{camera.name}] Activation window expired - resetting counter")
+                        camera.session_active = False
+                        camera.session_detections = 0
+                        camera.session_start = None
 
-                        # Get current frame
-                        with camera.frame_lock:
-                            frame = camera.current_frame
+                    # Get current frame
+                    with camera.frame_lock:
+                        frame = camera.current_frame
 
-                        if frame is not None:
-                            try:
-                                # Run detection
-                                deer_detected, detections, annotated_frame = self.detector.detect_deer(frame)
+                    # ALWAYS run detection when frames are available
+                    if frame is not None:
+                        try:
+                            # Run detection continuously
+                            deer_detected, detections, annotated_frame = self.detector.detect_deer(frame)
 
-                                # Store annotated frame for streaming
-                                if annotated_frame is not None:
-                                    _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                                    with camera.frame_lock:
-                                        camera.annotated_jpg = buffer.tobytes()
+                            # Store annotated frame for streaming (always show bounding boxes)
+                            if annotated_frame is not None:
+                                _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                with camera.frame_lock:
+                                    camera.annotated_jpg = buffer.tobytes()
 
-                                # Handle detections
-                                if detections:
-                                    from detection_storage import get_detection_storage
-                                    storage = get_detection_storage()
-                                    animal_type = detections[0]['class']
-                                    class_id = detections[0].get('class_id')
+                            # Handle detections
+                            if detections:
+                                from detection_storage import get_detection_storage
+                                storage = get_detection_storage()
+                                animal_type = detections[0]['class']
+                                class_id = detections[0].get('class_id')
 
-                                    # Check if this animal type is enabled in camera settings
-                                    enabled_objects = camera.detection_config.get('enabled_objects', {})
-                                    is_enabled = enabled_objects.get(animal_type.lower(), False)
+                                # Check if this animal type is enabled in camera settings
+                                enabled_objects = camera.detection_config.get('enabled_objects', {})
+                                is_enabled = enabled_objects.get(animal_type.lower(), False)
 
-                                    # Save to gallery only if enabled in camera settings
-                                    if is_enabled:
-                                        saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
-                                        logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename}")
-                                    else:
-                                        logger.info(f"ℹ️ [{camera.name}] {animal_type.upper()} detected but disabled in camera settings - not saving")
+                                # Save to gallery only if enabled in camera settings
+                                if is_enabled:
+                                    saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
+                                    logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename}")
+                                else:
+                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected but disabled in camera settings")
 
-                                    # Activate sprinkler if target animal is enabled (not person, safety check is in detector)
-                                    if deer_detected and is_enabled and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
-                                        camera.session_detections += 1
-                                        camera.last_detection = datetime.now().isoformat()
-                                        logger.info(f"🎯 [{camera.name}] {animal_type.upper()} detected! (#{camera.session_detections})")
+                                # Check if we should activate sprinkler
+                                now = time.time()
 
-                                        # Activate assigned devices
-                                        dm = get_device_manager()
-                                        logger.info(f"💨 [{camera.name}] Attempting to activate {len(camera.device_assignments)} device(s)")
-                                        if not camera.device_assignments:
-                                            logger.warning(f"⚠️ [{camera.name}] No device assignments configured!")
+                                # Check cooldown
+                                if camera.cooldown_until and now < camera.cooldown_until:
+                                    remaining = int(camera.cooldown_until - now)
+                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected but in cooldown ({remaining}s remaining)")
+                                    continue
 
-                                        for assignment in camera.device_assignments:
-                                            device_id = assignment['device_id']
-                                            duration = assignment['duration_seconds']
-                                            try:
-                                                logger.info(f"💨 [{camera.name}] Calling turn_on({device_id}, duration={duration})")
-                                                dm.turn_on(device_id, duration=duration)
-                                                camera.device_activated_at = time.time()
-                                                camera.device_duration = duration
-                                                logger.info(f"✅ [{camera.name}] Device {device_id} activated for {duration}s")
-                                            except Exception as e:
-                                                logger.error(f"❌ [{camera.name}] Failed to activate device {device_id}: {e}")
-                                    elif deer_detected and not is_enabled:
-                                        logger.info(f"ℹ️ [{camera.name}] {animal_type.upper()} detected but disabled in camera settings - not activating sprinkler")
+                                # Start new activation window if needed
+                                if not camera.session_active:
+                                    camera.session_active = True
+                                    camera.session_start = now
+                                    camera.session_detections = 0
+                                    logger.info(f"[{camera.name}] Starting new activation window")
 
-                            except Exception as e:
-                                logger.error(f"[{camera.name}] Detection error: {e}")
+                                # Check activation limit for this window
+                                if deer_detected and is_enabled and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
+                                    camera.session_detections += 1
+                                    camera.last_detection = datetime.now().isoformat()
+                                    logger.info(f"🎯 [{camera.name}] {animal_type.upper()} detected! (activation #{camera.session_detections})")
 
-                        time.sleep(0.5)  # Check twice per second
+                                    # Activate assigned devices
+                                    dm = get_device_manager()
+                                    logger.info(f"💨 [{camera.name}] Attempting to activate {len(camera.device_assignments)} device(s)")
+                                    if not camera.device_assignments:
+                                        logger.warning(f"⚠️ [{camera.name}] No device assignments configured!")
+
+                                    for assignment in camera.device_assignments:
+                                        device_id = assignment['device_id']
+                                        duration = assignment['duration_seconds']
+                                        try:
+                                            logger.info(f"💨 [{camera.name}] Calling turn_on({device_id}, duration={duration})")
+                                            dm.turn_on(device_id, duration=duration)
+                                            camera.device_activated_at = time.time()
+                                            camera.device_duration = duration
+                                            logger.info(f"✅ [{camera.name}] Device {device_id} activated for {duration}s")
+                                        except Exception as e:
+                                            logger.error(f"❌ [{camera.name}] Failed to activate device {device_id}: {e}")
+
+                                    # Check if we hit the limit and should start cooldown
+                                    if camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
+                                        camera.cooldown_until = now + camera.timing['cooldown_period_seconds']
+                                        logger.info(f"[{camera.name}] Max activations reached - starting {camera.timing['cooldown_period_seconds']}s cooldown")
+                                elif deer_detected and is_enabled and camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
+                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected but max activations reached for this window")
+
+                        except Exception as e:
+                            logger.error(f"[{camera.name}] Detection error: {e}")
                     else:
-                        # Not in session, just update current frame for preview
+                        # No frame available, wait briefly
                         time.sleep(0.1)
+
+                    # Process frames at ~2 FPS (reduce CPU usage)
+                    time.sleep(0.5)
 
                 except Exception as e:
                     logger.error(f"[{camera.name}] Detection worker error: {e}")
@@ -688,6 +734,39 @@ class CameraManager:
         thread = threading.Thread(target=detection_worker, daemon=True, name=f"DetectionWorker-{camera_id}")
         thread.start()
         self.detection_threads[camera_id] = thread
+
+    def _start_watchdog_thread(self):
+        """Start watchdog thread to monitor camera health"""
+        def watchdog_worker():
+            """Monitor cameras and mark offline if no frames received"""
+            logger.info("🐕 Camera watchdog started")
+            TIMEOUT_SECONDS = 30  # Mark offline if no frames for 30 seconds
+
+            while True:
+                try:
+                    now = time.time()
+                    for camera_id, camera in self.cameras.items():
+                        if not camera.enabled:
+                            continue
+
+                        # Check if camera has gone stale
+                        if camera.last_frame_time is not None:
+                            elapsed = now - camera.last_frame_time
+                            if elapsed > TIMEOUT_SECONDS and camera.online:
+                                logger.warning(f"⚠️ [{camera.name}] No frames for {int(elapsed)}s - marking offline")
+                                with camera.frame_lock:
+                                    camera.online = False
+                                    camera.stream_active = False
+                                    camera.wifi_signal = None
+
+                    time.sleep(10)  # Check every 10 seconds
+
+                except Exception as e:
+                    logger.error(f"Watchdog error: {e}")
+                    time.sleep(10)
+
+        thread = threading.Thread(target=watchdog_worker, daemon=True, name="CameraWatchdog")
+        thread.start()
 
     @staticmethod
     def _generate_camera_id(name: str) -> str:

@@ -648,6 +648,7 @@ function updateCameraFooter(cameraId, statusData) {
 function updateCameraIndicators(cameraId, statusData) {
     const pirElement = document.getElementById(`pir-status-${cameraId}`);
     const wifiElement = document.getElementById(`wifi-status-${cameraId}`);
+    const footerElement = document.getElementById(`camera-footer-${cameraId}`);
 
     // Update PIR status
     if (pirElement) {
@@ -689,8 +690,33 @@ function updateCameraIndicators(cameraId, statusData) {
         } else {
             wifiElement.textContent = 'WiFi: --';
             wifiElement.className = 'status-badge disabled';
-            wifiElement.title = 'No signal data';
+            wifiElement.title = 'No signal data - camera may be offline';
         }
+    }
+
+    // Update footer with connection health diagnostic (if diagnostics available)
+    if (footerElement && camerasData[cameraId] && camerasData[cameraId].diagnostics) {
+        const diagnostics = camerasData[cameraId].diagnostics;
+        let healthText, healthClass;
+
+        if (!statusData.online) {
+            healthText = '🔴 OFFLINE - No Connection';
+            healthClass = 'footer-status status-error';
+        } else if (diagnostics.seconds_since_frame === null) {
+            healthText = '🟡 CONNECTING...';
+            healthClass = 'footer-status status-warning';
+        } else if (diagnostics.seconds_since_frame < 5) {
+            healthText = `🟢 ACTIVE (${diagnostics.seconds_since_frame}s ago)`;
+            healthClass = 'footer-status status-success';
+        } else if (diagnostics.seconds_since_frame < 30) {
+            healthText = `🟡 STALE (${diagnostics.seconds_since_frame}s ago)`;
+            healthClass = 'footer-status status-warning';
+        } else {
+            healthText = `🔴 DISCONNECTED (${diagnostics.seconds_since_frame}s ago)`;
+            healthClass = 'footer-status status-error';
+        }
+
+        footerElement.innerHTML = `<div class="${healthClass}">${healthText}</div>`;
     }
 }
 

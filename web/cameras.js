@@ -105,6 +105,30 @@ class CameraManager {
             .map(([name, _]) => name)
             .join(', ');
 
+        // Diagnostic information
+        const wifiSignal = camera.state.wifi_signal !== null && camera.state.wifi_signal !== undefined
+            ? `${camera.state.wifi_signal} dBm`
+            : 'N/A';
+
+        const wifiClass = this.getWifiSignalClass(camera.state.wifi_signal);
+
+        // Last seen / connection health
+        let connectionHealth = '';
+        if (camera.diagnostics && camera.diagnostics.seconds_since_frame !== null) {
+            const seconds = camera.diagnostics.seconds_since_frame;
+            if (seconds < 5) {
+                connectionHealth = `<span style="color: #4CAF50;">Active (${seconds}s ago)</span>`;
+            } else if (seconds < 30) {
+                connectionHealth = `<span style="color: #FF9800;">Stale (${seconds}s ago)</span>`;
+            } else {
+                connectionHealth = `<span style="color: #f44336;">Disconnected (${seconds}s ago)</span>`;
+            }
+        } else if (camera.state.online) {
+            connectionHealth = '<span style="color: #999;">Connecting...</span>';
+        } else {
+            connectionHealth = '<span style="color: #f44336;">No connection</span>';
+        }
+
         return `
             <div class="camera-card">
                 <div class="camera-status">
@@ -123,6 +147,14 @@ class CameraManager {
                     <div class="camera-detail-item">
                         <span class="detail-label">Enabled:</span>
                         <span class="detail-value">${camera.enabled ? '✓ Yes' : '✗ No'}</span>
+                    </div>
+                    <div class="camera-detail-item">
+                        <span class="detail-label">Connection:</span>
+                        <span class="detail-value">${connectionHealth}</span>
+                    </div>
+                    <div class="camera-detail-item">
+                        <span class="detail-label">WiFi Signal:</span>
+                        <span class="detail-value ${wifiClass}">${wifiSignal}</span>
                     </div>
                     <div class="camera-detail-item">
                         <span class="detail-label">Detects:</span>
@@ -431,6 +463,23 @@ class CameraManager {
 
     showError(message) {
         alert('Error: ' + message);
+    }
+
+    getWifiSignalClass(signal) {
+        if (signal === null || signal === undefined) {
+            return 'wifi-none';
+        }
+        // WiFi signal strength classification (dBm)
+        // -50 or better = excellent
+        // -60 to -50 = good
+        // -70 to -60 = fair
+        // -80 to -70 = weak
+        // -80 or worse = very weak
+        if (signal >= -50) return 'wifi-excellent';
+        if (signal >= -60) return 'wifi-good';
+        if (signal >= -70) return 'wifi-fair';
+        if (signal >= -80) return 'wifi-weak';
+        return 'wifi-very-weak';
     }
 
     escapeHtml(text) {
