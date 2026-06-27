@@ -59,8 +59,8 @@ class DeerDetector:
                     confidence = float(box.conf[0])
                     class_name = result.names[class_id]
 
-                    # Log all detections for debugging
-                    logger.info(f"Detected: {class_name} (class {class_id}) with confidence: {confidence:.2f}")
+                    # Log at DEBUG level (filtered by camera settings in camera_manager)
+                    logger.debug(f"Detected: {class_name} (class {class_id}) with confidence: {confidence:.2f}")
 
                     # Get bounding box coordinates
                     x1, y1, x2, y2 = box.xyxy[0].tolist()
@@ -76,7 +76,8 @@ class DeerDetector:
                             'class_id': class_id
                         })
 
-                        logger.info(f"🎯 TARGET DETECTION ({class_name.upper()}) detected with confidence: {confidence:.2f}")
+                        # Don't log here - let camera_manager log after filtering by camera settings
+                        logger.debug(f"Target object ({class_name.upper()}) detected with confidence: {confidence:.2f}")
 
             # Get annotated frame
             annotated_frame = results[0].plot() if results else frame
