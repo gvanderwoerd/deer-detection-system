@@ -471,6 +471,13 @@ class CameraManager:
         if not camera:
             return
 
+        # Prevent duplicate threads
+        if camera_id in self.capture_threads:
+            existing_thread = self.capture_threads[camera_id]
+            if existing_thread.is_alive():
+                logger.debug(f"[{camera.name}] Capture thread already running, skipping")
+                return
+
         def capture_worker():
             logger.info(f"🎥 Starting capture thread for {camera.name}")
             connection_attempts = 0
@@ -616,6 +623,13 @@ class CameraManager:
         if not camera or not self.detector:
             return
 
+        # Prevent duplicate threads
+        if camera_id in self.detection_threads:
+            existing_thread = self.detection_threads[camera_id]
+            if existing_thread.is_alive():
+                logger.debug(f"[{camera.name}] Detection thread already running, skipping")
+                return
+
         def detection_worker():
             """Process frames continuously - cooldown only affects sprinkler activation"""
             from config import MAX_DETECTIONS_PER_SESSION
@@ -657,15 +671,22 @@ class CameraManager:
                                 storage = get_detection_storage()
                                 animal_type = detections[0]['class']
                                 class_id = detections[0].get('class_id')
+                                confidence = detections[0]['confidence']
 
                                 # Check if this animal type is enabled in camera settings
                                 enabled_objects = camera.detection_config.get('enabled_objects', {})
                                 is_enabled = enabled_objects.get(animal_type.lower(), False)
 
-                                # Save to gallery only if enabled in camera settings
-                                if is_enabled:
+                                # Check per-camera confidence threshold
+                                camera_threshold = camera.detection_config.get('confidence_threshold', 0.45)
+                                meets_threshold = confidence >= camera_threshold
+
+                                # Save to gallery only if enabled AND meets camera threshold
+                                if is_enabled and meets_threshold:
                                     saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
-                                    logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename}")
+                                    logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename} (confidence: {confidence:.2f})")
+                                elif is_enabled and not meets_threshold:
+                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected at {confidence:.2f} but below threshold {camera_threshold:.2f}")
                                 else:
                                     logger.debug(f"[{camera.name}] {animal_type.upper()} detected but disabled in camera settings")
 
@@ -685,8 +706,8 @@ class CameraManager:
                                     camera.session_detections = 0
                                     logger.info(f"[{camera.name}] Starting new activation window")
 
-                                # Check activation limit for this window
-                                if deer_detected and is_enabled and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
+                                # Check activation limit for this window (must meet threshold)
+                                if deer_detected and is_enabled and meets_threshold and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
                                     camera.session_detections += 1
                                     camera.last_detection = datetime.now().isoformat()
                                     logger.info(f"🎯 [{camera.name}] {animal_type.upper()} detected! (activation #{camera.session_detections})")
@@ -713,7 +734,7 @@ class CameraManager:
                                     if camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
                                         camera.cooldown_until = now + camera.timing['cooldown_period_seconds']
                                         logger.info(f"[{camera.name}] Max activations reached - starting {camera.timing['cooldown_period_seconds']}s cooldown")
-                                elif deer_detected and is_enabled and camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
+                                elif deer_detected and is_enabled and meets_threshold and camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
                                     logger.debug(f"[{camera.name}] {animal_type.upper()} detected but max activations reached for this window")
 
                         except Exception as e:
