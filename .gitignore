@@ -30,10 +30,13 @@ logs/
 *.old
 backups/
 
-# Detection images and metadata (generated at runtime)
-server/detections/*.jpg
-server/detections/*.png
-server/detections/detections.json
+# Detection images - privacy: local only, not in git
+# Camera footage should remain private and not be pushed to GitHub
+server/detections/**/*.jpg
+server/detections/**/*.png
+
+# Allow detection metadata (JSON logs) - no privacy concerns
+!server/detections/**/detections.json
 
 # Runtime
 *.pid
