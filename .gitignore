@@ -34,10 +34,12 @@ backups/
 # Camera footage should remain private and not be pushed to GitHub
 server/detections/**/*.jpg
 server/detections/**/*.png
-server/detections/detections.json
 
 # Allow detection metadata (JSON logs) in camera subdirectories - no privacy concerns
 !server/detections/**/detections.json
+
+# But ignore the top-level runtime file
+server/detections/detections.json
 
 # Runtime
 *.pid
