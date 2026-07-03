@@ -1,7 +1,7 @@
 # Development Notes - Deer Detection System
 
 **Purpose:** Track issues, solutions, and learnings for AI agent reference
-**Last Updated:** 2026-06-19
+**Last Updated:** 2026-07-03
 **Instructions for AI Agents:** Add new session learnings to this file after troubleshooting or implementing features
 
 ---
@@ -51,6 +51,79 @@
 ---
 
 ## Software: Common Issues & Solutions
+
+### Thread Leak - Critical Memory/CPU Issue (2026-07-03)
+
+**Problem:** Server accumulated 66 threads over 36 hours, causing CPU overload (259% constantly)
+
+**Symptoms:**
+- Thread count growing from expected ~10-20 to 66+
+- High CPU usage accumulating over time (2194+ minutes CPU time)
+- Cameras timing out intermittently
+- Server appearing "overloaded" despite normal operations
+
+**Root Cause:**
+Worker threads (`capture_worker` and `detection_worker`) never cleaned up their dictionary entries when exiting:
+```python
+# Before - BUG: No cleanup
+def capture_worker():
+    logger.info("Starting...")
+    while camera_id in self.cameras:
+        # ... work ...
+    logger.info("Stopped")  # Dictionary entry still exists!
+```
+
+**Why It Happened:**
+- Threads added to `self.capture_threads[camera_id]` and `self.detection_threads[camera_id]`
+- When threads crashed, timed out, or exited normally, entries remained
+- Over days of operation, zombie thread references accumulated
+- Race condition fix (July 1) prevented duplicate starts but didn't address cleanup
+
+**Solution - Thread Lifecycle Management:**
+```python
+# After - FIXED: Always cleanup
+def capture_worker():
+    try:
+        logger.info("Starting...")
+        while camera_id in self.cameras:
+            # ... work ...
+    finally:
+        # Guaranteed cleanup even on exception
+        if camera_id in self.capture_threads:
+            del self.capture_threads[camera_id]
+        logger.info("Stopped")
+```
+
+**Additional Fix:**
+Changed `detection_worker` from `while True:` to `while camera_id in self.cameras:` to allow graceful exit when camera is deleted.
+
+**Diagnosis Commands:**
+```bash
+# Check current thread count (expected: ~10-20 for 3 cameras)
+ps -T -p $(pgrep -f "python3 main.py") | wc -l
+
+# Monitor for leak (count should stay constant)
+for i in {1..6}; do
+    echo "Check $i: $(ps -T -p $(pgrep -f 'python3 main.py') | wc -l) threads"
+    sleep 10
+done
+
+# Check if CPU time is proportional to runtime
+ps aux | grep "python3 main.py"
+# Normal: 290% CPU after 5 min = ~15 min CPU time
+# Leak: 259% CPU after 36 hours = 2194 min CPU time (disproportionate)
+```
+
+**Results:**
+- Thread count stable at 68-69 (verified over 60+ seconds)
+- CPU usage proportional to runtime (not accumulating)
+- All cameras streaming reliably
+
+**Lesson:** Always use try/finally for resource cleanup in long-running threads. Thread dictionary entries are resources that need explicit management. The `finally` block guarantees execution even during exceptions or crashes.
+
+**Files Modified:** `server/camera_manager.py` (capture_worker, detection_worker)
+
+---
 
 ### Timestamp Rendering
 

@@ -482,139 +482,143 @@ class CameraManager:
         self.capture_threads[camera_id] = None  # Placeholder
 
         def capture_worker():
-            logger.info(f"🎥 Starting capture thread for {camera.name}")
-            connection_attempts = 0
+            try:
+                logger.info(f"🎥 Starting capture thread for {camera.name}")
+                connection_attempts = 0
 
-            while camera_id in self.cameras:  # Continue until camera is deleted
-                try:
-                    if not camera.enabled:
-                        time.sleep(1)
-                        continue
+                while camera_id in self.cameras:  # Continue until camera is deleted
+                    try:
+                        if not camera.enabled:
+                            time.sleep(1)
+                            continue
 
-                    connection_attempts += 1
-                    if connection_attempts == 1 or connection_attempts % 10 == 0:
-                        logger.debug(f"[{camera.name}] Connecting to stream (attempt {connection_attempts})...")
+                        connection_attempts += 1
+                        if connection_attempts == 1 or connection_attempts % 10 == 0:
+                            logger.debug(f"[{camera.name}] Connecting to stream (attempt {connection_attempts})...")
 
-                    stream = requests.get(camera.stream_url, stream=True, timeout=10)
-                    connection_attempts = 0
+                        stream = requests.get(camera.stream_url, stream=True, timeout=10)
+                        connection_attempts = 0
 
-                    bytes_buffer = b''
-                    frame_count = 0
+                        bytes_buffer = b''
+                        frame_count = 0
 
-                    for chunk in stream.iter_content(chunk_size=1024):
-                        if camera_id not in self.cameras:  # Check if camera was deleted
-                            break
+                        for chunk in stream.iter_content(chunk_size=1024):
+                            if camera_id not in self.cameras:  # Check if camera was deleted
+                                break
 
-                        bytes_buffer += chunk
+                            bytes_buffer += chunk
 
-                        # Parse PIR status
-                        pir_header_marker = b'X-PIR-Status: '
-                        pir_pos = bytes_buffer.find(pir_header_marker)
-                        if pir_pos != -1:
-                            status_start = pir_pos + len(pir_header_marker)
-                            status_end = bytes_buffer.find(b'\r\n', status_start)
-                            if status_end != -1:
-                                pir_status = bytes_buffer[status_start:status_end].decode('utf-8').strip()
-                                is_active = (pir_status == 'active')
+                            # Parse PIR status
+                            pir_header_marker = b'X-PIR-Status: '
+                            pir_pos = bytes_buffer.find(pir_header_marker)
+                            if pir_pos != -1:
+                                status_start = pir_pos + len(pir_header_marker)
+                                status_end = bytes_buffer.find(b'\r\n', status_start)
+                                if status_end != -1:
+                                    pir_status = bytes_buffer[status_start:status_end].decode('utf-8').strip()
+                                    is_active = (pir_status == 'active')
 
-                                if camera.motion_active != is_active:
-                                    camera.motion_active = is_active
-                                    if is_active:
-                                        logger.info(f"[{camera.name}] PIR: MOTION DETECTED - Resetting cooldown")
-                                        # Reset cooldown when motion detected (allows immediate sprinkler activation)
-                                        camera.cooldown_until = None
-                                        # Start new activation window if not already active
-                                        if not camera.session_active:
-                                            camera.session_active = True
-                                            camera.session_detections = 0
-                                            camera.session_start = time.time()
-                                            logger.info(f"✅ [{camera.name}] New activation window started via PIR")
-                                    logger.debug(f"[{camera.name}] PIR: {'MOTION' if is_active else 'no motion'}")
+                                    if camera.motion_active != is_active:
+                                        camera.motion_active = is_active
+                                        if is_active:
+                                            logger.info(f"[{camera.name}] PIR: MOTION DETECTED - Resetting cooldown")
+                                            # Reset cooldown when motion detected (allows immediate sprinkler activation)
+                                            camera.cooldown_until = None
+                                            # Start new activation window if not already active
+                                            if not camera.session_active:
+                                                camera.session_active = True
+                                                camera.session_detections = 0
+                                                camera.session_start = time.time()
+                                                logger.info(f"✅ [{camera.name}] New activation window started via PIR")
+                                        logger.debug(f"[{camera.name}] PIR: {'MOTION' if is_active else 'no motion'}")
 
-                        # Parse WiFi signal
-                        wifi_header_marker = b'X-WiFi-Signal: '
-                        wifi_pos = bytes_buffer.find(wifi_header_marker)
-                        if wifi_pos != -1:
-                            signal_start = wifi_pos + len(wifi_header_marker)
-                            signal_end = bytes_buffer.find(b'\r\n', signal_start)
-                            if signal_end != -1:
-                                try:
-                                    camera.wifi_signal = int(bytes_buffer[signal_start:signal_end].decode('utf-8').strip())
-                                except ValueError:
-                                    pass
+                            # Parse WiFi signal
+                            wifi_header_marker = b'X-WiFi-Signal: '
+                            wifi_pos = bytes_buffer.find(wifi_header_marker)
+                            if wifi_pos != -1:
+                                signal_start = wifi_pos + len(wifi_header_marker)
+                                signal_end = bytes_buffer.find(b'\r\n', signal_start)
+                                if signal_end != -1:
+                                    try:
+                                        camera.wifi_signal = int(bytes_buffer[signal_start:signal_end].decode('utf-8').strip())
+                                    except ValueError:
+                                        pass
 
-                        # Extract JPEG frames
-                        a = bytes_buffer.find(b'\xff\xd8')
-                        b = bytes_buffer.find(b'\xff\xd9')
+                            # Extract JPEG frames
+                            a = bytes_buffer.find(b'\xff\xd8')
+                            b = bytes_buffer.find(b'\xff\xd9')
 
-                        if a != -1 and b != -1:
-                            jpg = bytes_buffer[a:b+2]
-                            bytes_buffer = bytes_buffer[b+2:]
+                            if a != -1 and b != -1:
+                                jpg = bytes_buffer[a:b+2]
+                                bytes_buffer = bytes_buffer[b+2:]
 
-                            frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
+                                frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
 
-                            if frame is not None:
-                                # Apply flip transformations if configured
-                                frame = camera.apply_flip(frame)
-                                if frame is None:
-                                    logger.error(f"[{camera.name}] apply_flip returned None!")
-                                    continue  # Skip this frame if apply_flip failed
-                                # Update timestamp text once per second
-                                now = time.time()
-                                if now - camera.last_timestamp_update >= 1.0:
-                                    camera.current_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-                                    camera.last_timestamp_update = now
-                                    logger.debug(f"[{camera.name}] Updated timestamp text: {camera.current_timestamp}")
-
-                                # Apply timestamp overlay to EVERY frame (using current timestamp text)
-                                font = cv2.FONT_HERSHEY_SIMPLEX
-                                scale = 0.65
-                                thickness = 2
-                                color = (255, 255, 255)
-
-                                (text_width, text_height), baseline = cv2.getTextSize(camera.current_timestamp, font, scale, thickness)
-                                x, y = 10, frame.shape[0] - 10
-
-                                # Draw timestamp on frame
-                                cv2.rectangle(frame, (x, y - text_height - 5), (x + text_width, y + baseline), (0, 0, 0), -1)
-                                cv2.putText(frame, camera.current_timestamp, (x, y), font, scale, color, thickness, cv2.LINE_AA)
-
-                                # Re-encode frame as JPEG (always, after flip and timestamp)
-                                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                                jpg = buffer.tobytes()
-
-                                with camera.frame_lock:
-                                    camera.current_frame = frame
-                                    camera.current_jpg = jpg  # Store JPEG with timestamp and flip
-
-                                    # Mark camera as online
+                                if frame is not None:
+                                    # Apply flip transformations if configured
+                                    frame = camera.apply_flip(frame)
+                                    if frame is None:
+                                        logger.error(f"[{camera.name}] apply_flip returned None!")
+                                        continue  # Skip this frame if apply_flip failed
+                                    # Update timestamp text once per second
                                     now = time.time()
-                                    if camera.last_frame_time is None:
-                                        logger.info(f"📷 [{camera.name}] Stream active")
-                                        camera.stream_active = True
-                                        camera.online = True
+                                    if now - camera.last_timestamp_update >= 1.0:
+                                        camera.current_timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+                                        camera.last_timestamp_update = now
+                                        logger.debug(f"[{camera.name}] Updated timestamp text: {camera.current_timestamp}")
 
-                                    camera.last_frame_time = now
+                                    # Apply timestamp overlay to EVERY frame (using current timestamp text)
+                                    font = cv2.FONT_HERSHEY_SIMPLEX
+                                    scale = 0.65
+                                    thickness = 2
+                                    color = (255, 255, 255)
 
-                                frame_count += 1
-                                if frame_count % 1000 == 0:
-                                    logger.debug(f"[{camera.name}] Captured {frame_count} frames")
+                                    (text_width, text_height), baseline = cv2.getTextSize(camera.current_timestamp, font, scale, thickness)
+                                    x, y = 10, frame.shape[0] - 10
 
-                except Exception as e:
-                    logger.error(f"[{camera.name}] Capture error: {e}")
-                    with camera.frame_lock:
-                        camera.current_frame = None
-                        camera.current_jpg = None
-                        camera.wifi_signal = None
-                        if camera.stream_active:
-                            logger.info(f"📷 [{camera.name}] Stream inactive")
-                            camera.stream_active = False
-                        # Always set offline on connection error
-                        camera.online = False
-                        camera.last_frame_time = None
-                    time.sleep(5)
+                                    # Draw timestamp on frame
+                                    cv2.rectangle(frame, (x, y - text_height - 5), (x + text_width, y + baseline), (0, 0, 0), -1)
+                                    cv2.putText(frame, camera.current_timestamp, (x, y), font, scale, color, thickness, cv2.LINE_AA)
 
-            logger.info(f"🛑 Stopped capture thread for {camera.name}")
+                                    # Re-encode frame as JPEG (always, after flip and timestamp)
+                                    _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                    jpg = buffer.tobytes()
+
+                                    with camera.frame_lock:
+                                        camera.current_frame = frame
+                                        camera.current_jpg = jpg  # Store JPEG with timestamp and flip
+
+                                        # Mark camera as online
+                                        now = time.time()
+                                        if camera.last_frame_time is None:
+                                            logger.info(f"📷 [{camera.name}] Stream active")
+                                            camera.stream_active = True
+                                            camera.online = True
+
+                                        camera.last_frame_time = now
+
+                                    frame_count += 1
+                                    if frame_count % 1000 == 0:
+                                        logger.debug(f"[{camera.name}] Captured {frame_count} frames")
+
+                    except Exception as e:
+                        logger.error(f"[{camera.name}] Capture error: {e}")
+                        with camera.frame_lock:
+                            camera.current_frame = None
+                            camera.current_jpg = None
+                            camera.wifi_signal = None
+                            if camera.stream_active:
+                                logger.info(f"📷 [{camera.name}] Stream inactive")
+                                camera.stream_active = False
+                            # Always set offline on connection error
+                            camera.online = False
+                            camera.last_frame_time = None
+                        time.sleep(5)
+            finally:
+                # Clean up thread reference when exiting
+                if camera_id in self.capture_threads:
+                    del self.capture_threads[camera_id]
+                logger.info(f"🛑 Stopped capture thread for {camera.name}")
 
         thread = threading.Thread(target=capture_worker, daemon=True, name=f"CaptureWorker-{camera_id}")
         thread.start()
@@ -641,122 +645,126 @@ class CameraManager:
             from config import MAX_DETECTIONS_PER_SESSION
             from device_manager import get_device_manager
 
-            logger.info(f"🎯 Detection worker started for {camera.name}")
-            logger.info(f"   Device assignments: {len(camera.device_assignments)} device(s)")
-            for idx, assignment in enumerate(camera.device_assignments):
-                logger.info(f"   - Device {idx+1}: {assignment.get('device_id')} ({assignment.get('duration_seconds')}s)")
+            try:
+                logger.info(f"🎯 Detection worker started for {camera.name}")
+                logger.info(f"   Device assignments: {len(camera.device_assignments)} device(s)")
+                for idx, assignment in enumerate(camera.device_assignments):
+                    logger.info(f"   - Device {idx+1}: {assignment.get('device_id')} ({assignment.get('duration_seconds')}s)")
 
-            while True:
-                try:
-                    # Reset activation window if expired
-                    if camera.session_active and camera.is_session_expired():
-                        logger.info(f"[{camera.name}] Activation window expired - resetting counter")
-                        camera.session_active = False
-                        camera.session_detections = 0
-                        camera.session_start = None
+                while camera_id in self.cameras:  # Continue until camera is deleted
+                    try:
+                        # Reset activation window if expired
+                        if camera.session_active and camera.is_session_expired():
+                            logger.info(f"[{camera.name}] Activation window expired - resetting counter")
+                            camera.session_active = False
+                            camera.session_detections = 0
+                            camera.session_start = None
 
-                    # Get current frame
-                    with camera.frame_lock:
-                        frame = camera.current_frame
+                        # Get current frame
+                        with camera.frame_lock:
+                            frame = camera.current_frame
 
-                    # ALWAYS run detection when frames are available
-                    if frame is not None:
-                        try:
-                            # Run detection continuously
-                            deer_detected, detections, annotated_frame = self.detector.detect_deer(frame)
+                        # ALWAYS run detection when frames are available
+                        if frame is not None:
+                            try:
+                                # Run detection continuously
+                                deer_detected, detections, annotated_frame = self.detector.detect_deer(frame)
 
-                            # Store annotated frame for streaming (always show bounding boxes)
-                            if annotated_frame is not None:
-                                _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                                with camera.frame_lock:
-                                    camera.annotated_jpg = buffer.tobytes()
+                                # Store annotated frame for streaming (always show bounding boxes)
+                                if annotated_frame is not None:
+                                    _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                                    with camera.frame_lock:
+                                        camera.annotated_jpg = buffer.tobytes()
 
-                            # Handle detections
-                            if detections:
-                                from detection_storage import get_detection_storage
-                                storage = get_detection_storage()
-                                animal_type = detections[0]['class']
-                                class_id = detections[0].get('class_id')
-                                confidence = detections[0]['confidence']
+                                # Handle detections
+                                if detections:
+                                    from detection_storage import get_detection_storage
+                                    storage = get_detection_storage()
+                                    animal_type = detections[0]['class']
+                                    class_id = detections[0].get('class_id')
+                                    confidence = detections[0]['confidence']
 
-                                # Check if this animal type is enabled in camera settings
-                                enabled_objects = camera.detection_config.get('enabled_objects', {})
-                                is_enabled = enabled_objects.get(animal_type.lower(), False)
+                                    # Check if this animal type is enabled in camera settings
+                                    enabled_objects = camera.detection_config.get('enabled_objects', {})
+                                    is_enabled = enabled_objects.get(animal_type.lower(), False)
 
-                                # Check per-camera confidence threshold
-                                camera_threshold = camera.detection_config.get('confidence_threshold', 0.45)
-                                meets_threshold = confidence >= camera_threshold
+                                    # Check per-camera confidence threshold
+                                    camera_threshold = camera.detection_config.get('confidence_threshold', 0.45)
+                                    meets_threshold = confidence >= camera_threshold
 
-                                # Save to gallery only if enabled AND meets camera threshold
-                                if is_enabled and meets_threshold:
-                                    saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
-                                    logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename} (confidence: {confidence:.2f})")
-                                elif is_enabled and not meets_threshold:
-                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected at {confidence:.2f} but below threshold {camera_threshold:.2f}")
-                                else:
-                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected but disabled in camera settings")
+                                    # Save to gallery only if enabled AND meets camera threshold
+                                    if is_enabled and meets_threshold:
+                                        saved_filename = storage.save_detection(camera_id, annotated_frame, detections, animal_type)
+                                        logger.info(f"📸 [{camera.name}] Detection saved: {saved_filename} (confidence: {confidence:.2f})")
+                                    elif is_enabled and not meets_threshold:
+                                        logger.debug(f"[{camera.name}] {animal_type.upper()} detected at {confidence:.2f} but below threshold {camera_threshold:.2f}")
+                                    else:
+                                        logger.debug(f"[{camera.name}] {animal_type.upper()} detected but disabled in camera settings")
 
-                                # Check if we should activate sprinkler
-                                now = time.time()
+                                    # Check if we should activate sprinkler
+                                    now = time.time()
 
-                                # Check cooldown
-                                if camera.cooldown_until and now < camera.cooldown_until:
-                                    remaining = int(camera.cooldown_until - now)
-                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected but in cooldown ({remaining}s remaining)")
-                                    continue
+                                    # Check cooldown
+                                    if camera.cooldown_until and now < camera.cooldown_until:
+                                        remaining = int(camera.cooldown_until - now)
+                                        logger.debug(f"[{camera.name}] {animal_type.upper()} detected but in cooldown ({remaining}s remaining)")
+                                        continue
 
-                                # Start new activation window if needed
-                                if not camera.session_active:
-                                    camera.session_active = True
-                                    camera.session_start = now
-                                    camera.session_detections = 0
-                                    logger.info(f"[{camera.name}] Starting new activation window")
+                                    # Start new activation window if needed
+                                    if not camera.session_active:
+                                        camera.session_active = True
+                                        camera.session_start = now
+                                        camera.session_detections = 0
+                                        logger.info(f"[{camera.name}] Starting new activation window")
 
-                                # Check activation limit for this window (must meet threshold)
-                                if deer_detected and is_enabled and meets_threshold and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
-                                    camera.session_detections += 1
-                                    camera.last_detection = datetime.now().isoformat()
-                                    logger.info(f"🎯 [{camera.name}] {animal_type.upper()} detected! (activation #{camera.session_detections})")
+                                    # Check activation limit for this window (must meet threshold)
+                                    if deer_detected and is_enabled and meets_threshold and camera.session_detections < MAX_DETECTIONS_PER_SESSION:
+                                        camera.session_detections += 1
+                                        camera.last_detection = datetime.now().isoformat()
+                                        logger.info(f"🎯 [{camera.name}] {animal_type.upper()} detected! (activation #{camera.session_detections})")
 
-                                    # Activate assigned devices
-                                    dm = get_device_manager()
-                                    logger.info(f"💨 [{camera.name}] Attempting to activate {len(camera.device_assignments)} device(s)")
-                                    if not camera.device_assignments:
-                                        logger.warning(f"⚠️ [{camera.name}] No device assignments configured!")
+                                        # Activate assigned devices
+                                        dm = get_device_manager()
+                                        logger.info(f"💨 [{camera.name}] Attempting to activate {len(camera.device_assignments)} device(s)")
+                                        if not camera.device_assignments:
+                                            logger.warning(f"⚠️ [{camera.name}] No device assignments configured!")
 
-                                    for assignment in camera.device_assignments:
-                                        device_id = assignment['device_id']
-                                        duration = assignment['duration_seconds']
-                                        try:
-                                            logger.info(f"💨 [{camera.name}] Calling turn_on({device_id}, duration={duration})")
-                                            dm.turn_on(device_id, duration=duration)
-                                            camera.device_activated_at = time.time()
-                                            camera.device_duration = duration
-                                            logger.info(f"✅ [{camera.name}] Device {device_id} activated for {duration}s")
-                                        except Exception as e:
-                                            logger.error(f"❌ [{camera.name}] Failed to activate device {device_id}: {e}")
+                                        for assignment in camera.device_assignments:
+                                            device_id = assignment['device_id']
+                                            duration = assignment['duration_seconds']
+                                            try:
+                                                logger.info(f"💨 [{camera.name}] Calling turn_on({device_id}, duration={duration})")
+                                                dm.turn_on(device_id, duration=duration)
+                                                camera.device_activated_at = time.time()
+                                                camera.device_duration = duration
+                                                logger.info(f"✅ [{camera.name}] Device {device_id} activated for {duration}s")
+                                            except Exception as e:
+                                                logger.error(f"❌ [{camera.name}] Failed to activate device {device_id}: {e}")
 
-                                    # Check if we hit the limit and should start cooldown
-                                    if camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
-                                        camera.cooldown_until = now + camera.timing['cooldown_period_seconds']
-                                        logger.info(f"[{camera.name}] Max activations reached - starting {camera.timing['cooldown_period_seconds']}s cooldown")
-                                elif deer_detected and is_enabled and meets_threshold and camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
-                                    logger.debug(f"[{camera.name}] {animal_type.upper()} detected but max activations reached for this window")
+                                        # Check if we hit the limit and should start cooldown
+                                        if camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
+                                            camera.cooldown_until = now + camera.timing['cooldown_period_seconds']
+                                            logger.info(f"[{camera.name}] Max activations reached - starting {camera.timing['cooldown_period_seconds']}s cooldown")
+                                    elif deer_detected and is_enabled and meets_threshold and camera.session_detections >= MAX_DETECTIONS_PER_SESSION:
+                                        logger.debug(f"[{camera.name}] {animal_type.upper()} detected but max activations reached for this window")
 
-                        except Exception as e:
-                            logger.error(f"[{camera.name}] Detection error: {e}")
-                    else:
-                        # No frame available, wait briefly
-                        time.sleep(0.1)
+                            except Exception as e:
+                                logger.error(f"[{camera.name}] Detection error: {e}")
+                        else:
+                            # No frame available, wait briefly
+                            time.sleep(0.1)
 
-                    # Process frames at ~2 FPS (reduce CPU usage)
-                    time.sleep(0.5)
+                        # Process frames at ~2 FPS (reduce CPU usage)
+                        time.sleep(0.5)
 
-                except Exception as e:
-                    logger.error(f"[{camera.name}] Detection worker error: {e}")
-                    time.sleep(1)
-
-            logger.info(f"🛑 Detection worker stopped for {camera.name}")
+                    except Exception as e:
+                        logger.error(f"[{camera.name}] Detection worker error: {e}")
+                        time.sleep(1)
+            finally:
+                # Clean up thread reference when exiting
+                if camera_id in self.detection_threads:
+                    del self.detection_threads[camera_id]
+                logger.info(f"🛑 Detection worker stopped for {camera.name}")
 
         thread = threading.Thread(target=detection_worker, daemon=True, name=f"DetectionWorker-{camera_id}")
         thread.start()
