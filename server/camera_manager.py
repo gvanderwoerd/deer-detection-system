@@ -471,12 +471,15 @@ class CameraManager:
         if not camera:
             return
 
-        # Prevent duplicate threads
+        # Prevent duplicate threads - check and mark atomically
         if camera_id in self.capture_threads:
             existing_thread = self.capture_threads[camera_id]
-            if existing_thread.is_alive():
+            if existing_thread and existing_thread.is_alive():
                 logger.debug(f"[{camera.name}] Capture thread already running, skipping")
                 return
+
+        # Mark as starting immediately to prevent race condition
+        self.capture_threads[camera_id] = None  # Placeholder
 
         def capture_worker():
             logger.info(f"🎥 Starting capture thread for {camera.name}")
@@ -623,12 +626,15 @@ class CameraManager:
         if not camera or not self.detector:
             return
 
-        # Prevent duplicate threads
+        # Prevent duplicate threads - check and mark atomically
         if camera_id in self.detection_threads:
             existing_thread = self.detection_threads[camera_id]
-            if existing_thread.is_alive():
+            if existing_thread and existing_thread.is_alive():
                 logger.debug(f"[{camera.name}] Detection thread already running, skipping")
                 return
+
+        # Mark as starting immediately to prevent race condition
+        self.detection_threads[camera_id] = None  # Placeholder
 
         def detection_worker():
             """Process frames continuously - cooldown only affects sprinkler activation"""
