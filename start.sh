@@ -70,9 +70,16 @@ detect_hardware() {
     echo "requirements-cpu.txt"
 }
 
+# Check if we can use system packages (preferred - faster startup)
+USE_SYSTEM_PACKAGES=false
+if python3 -c "import flask; import cv2; import ultralytics; import torch" 2>/dev/null; then
+    echo -e "${GREEN}✓ Using system-wide Python packages${NC}"
+    USE_SYSTEM_PACKAGES=true
+fi
+
 # Check if venv needs to be rebuilt (for portability after moving project)
 VENV_NEEDS_REBUILD=false
-if [ -d "venv" ] && [ -f "venv/pyvenv.cfg" ]; then
+if [ "$USE_SYSTEM_PACKAGES" = false ] && [ -d "venv" ] && [ -f "venv/pyvenv.cfg" ]; then
     # Get the expected venv path from current location
     CURRENT_VENV_PATH="$(pwd)/venv"
     # Get the actual venv path from config
@@ -120,15 +127,15 @@ if [ -d "venv" ] && [ -f "venv/pyvenv.cfg" ]; then
     fi
 fi
 
-# Check if virtual environment exists, create if not
-if [ ! -d "venv" ]; then
+# Check if virtual environment exists, create if not (only if system packages not available)
+if [ "$USE_SYSTEM_PACKAGES" = false ] && [ ! -d "venv" ]; then
     echo -e "${YELLOW}Creating virtual environment...${NC}"
     python3 -m venv venv
     echo -e "${GREEN}✓ Virtual environment created${NC}"
 fi
 
-# Activate virtual environment (skip if already activated during rebuild)
-if [ "$VENV_NEEDS_REBUILD" = false ]; then
+# Activate virtual environment (skip if using system packages or already activated during rebuild)
+if [ "$USE_SYSTEM_PACKAGES" = false ] && [ "$VENV_NEEDS_REBUILD" = false ]; then
     echo -e "${YELLOW}Activating virtual environment...${NC}"
     source venv/bin/activate
 
@@ -159,7 +166,11 @@ fi
 
 # Start the Flask server with nohup (keeps running after terminal closes)
 echo -e "${GREEN}Starting Flask server...${NC}"
-nohup python3 main.py > ../logs/server.log 2>&1 &
+if [ "$USE_SYSTEM_PACKAGES" = true ]; then
+    nohup python3 main.py > ../logs/server.log 2>&1 &
+else
+    nohup python3 main.py > ../logs/server.log 2>&1 &
+fi
 SERVER_PID=$!
 echo $SERVER_PID > ../server.pid
 
