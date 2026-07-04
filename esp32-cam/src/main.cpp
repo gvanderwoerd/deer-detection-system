@@ -42,12 +42,12 @@ const char* WIFI_PASSWORD = "cf72cc1722f549aa";
 
 // mDNS Hostname - Device will be accessible at http://HOSTNAME.local:81/
 // CUSTOMIZE: Change "esp32cam" to unique name for each device
-const char* MDNS_HOSTNAME = "esp32cam";  // Device #1: "esp32cam", Device #2: "esp32cam2", etc.
+const char* MDNS_HOSTNAME = "esp32cam";  // Device #1: Default Camera
 
 // Static IP Configuration
 // CUSTOMIZE: Change last number (.100) for each device
 // Example: Device #1: .100, Device #2: .101, Device #3: .102
-IPAddress STATIC_IP(192, 168, 1, 100);   // This device's IP address
+IPAddress STATIC_IP(192, 168, 1, 100);   // This device's IP address (Camera 1)
 IPAddress GATEWAY(192, 168, 1, 1);       // Router IP (usually .1)
 IPAddress SUBNET(255, 255, 255, 0);      // Standard home network subnet
 IPAddress DNS1(192, 168, 1, 1);          // Primary DNS (usually router)

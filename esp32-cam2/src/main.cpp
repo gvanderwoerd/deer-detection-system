@@ -42,7 +42,7 @@ const char* WIFI_PASSWORD = "cf72cc1722f549aa";
 
 // mDNS Hostname - Device will be accessible at http://HOSTNAME.local:81/
 // CUSTOMIZE: Change "esp32cam" to unique name for each device
-const char* MDNS_HOSTNAME = "esp32cam-back";  // Device #2: Back Yard Camera
+const char* MDNS_HOSTNAME = "esp32cam-back";  // Device #2: Front Garden
 
 // Static IP Configuration
 // CUSTOMIZE: Change last number (.100) for each device
